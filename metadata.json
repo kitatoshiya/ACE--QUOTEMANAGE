@@ -1,0 +1,6 @@
+{
+  "name": "ACE船用品輸出 見積管理・共有ボード",
+  "description": "船用品航空輸送の見積依頼・進捗状況・スレッド管理・Gemini APIによるメール自動構造化アプリ",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
