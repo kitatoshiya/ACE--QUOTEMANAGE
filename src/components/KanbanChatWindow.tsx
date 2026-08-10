@@ -15,7 +15,7 @@ import {
   RotateCcw,
 } from "lucide-react";
 import { ChatMessage, ChatWindowState, ChatTypingStatus, StaffMember, UserProfile } from "../types";
-import { isUserMentioned } from "../lib/mentionUtils";
+import { isUserMentioned, processMentionNotificationsAndEmails } from "../lib/mentionUtils";
 import { triggerDesktopNotification } from "../lib/notificationHelper";
 
 interface KanbanChatWindowProps {
@@ -364,7 +364,19 @@ export function KanbanChatWindow({
       }
     });
 
+    const newMsgId = `chat-${Date.now()}`;
     onSendMessage(trimmed, mentionedEmails);
+
+    // Process background emails & window notifications
+    processMentionNotificationsAndEmails({
+      contentHtml: trimmed,
+      senderName: currentUser.name,
+      senderEmail: currentUser.email,
+      currentUser,
+      staffMembers,
+      msgId: newMsgId,
+    }).catch((e) => console.warn("Mention notify error:", e));
+
     setInputText("");
     setShowMentionMenu(false);
   };

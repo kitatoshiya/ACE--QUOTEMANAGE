@@ -13,6 +13,7 @@ import {
 import { ExternalLink, QuotationItem, QuoteStatus, StaffMember, UserProfile } from "../types";
 import { convertTsvToHtmlTable } from "../lib/excelParser";
 import { isValidIataCode } from "../lib/iataAirports";
+import { processMentionNotificationsAndEmails } from "../lib/mentionUtils";
 import { UnifiedRichEditor } from "./UnifiedRichEditor";
 
 interface NewQuoteModalProps {
@@ -128,6 +129,29 @@ export const NewQuoteModal: React.FC<NewQuoteModalProps> = ({
       },
       initialContent
     );
+
+    // Process mentions for new quote creation
+    processMentionNotificationsAndEmails({
+      contentHtml: initialContent,
+      quote: {
+        id: "new-quote",
+        title: title.trim(),
+        vesselName: vesselName.trim() || "未指定",
+        airportCodes: cleanAirports.length > 0 ? cleanAirports : ["SIN"],
+        status,
+        isUrgent,
+        createdBy: currentUser.email,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        lastRepliedAt: new Date().toISOString(),
+        readBy: [currentUser.email],
+      },
+      senderName: currentUser.name,
+      senderEmail: currentUser.email,
+      currentUser,
+      staffMembers,
+      msgId: `new-quote-${Date.now()}`,
+    }).catch((e) => console.warn("Mention notify error on new quote:", e));
 
     // Reset form
     setTitle("");

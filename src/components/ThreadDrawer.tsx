@@ -44,6 +44,7 @@ import {
   formatCustomsDate,
 } from "../types";
 import { convertTsvToHtmlTable, copyToClipboard } from "../lib/excelParser";
+import { processMentionNotificationsAndEmails } from "../lib/mentionUtils";
 import { KANBAN_COLUMNS } from "./KanbanBoard";
 import { UnifiedRichEditor } from "./UnifiedRichEditor";
 import { FilePreviewModal, PreviewFile } from "./FilePreviewModal";
@@ -522,22 +523,17 @@ export const ThreadDrawer: React.FC<ThreadDrawerProps> = ({
       }
     });
 
-    // Check if staff mentions exist in reply text
-    const mentionedStaffs = extractMentionsFromContent(formattedContent, staffMembers || []);
-    if (mentionedStaffs.length > 0 && quote) {
-      const names = mentionedStaffs.map((s) => s.name).join(", ");
-      triggerDesktopNotification(
-        `[メンション通知] ${quote.title}`,
-        `${currentUser.name}さんから ${names} さん宛てに返信が投稿されました: ${stripHtmlToPlainText(formattedContent).slice(0, 60)}...`,
-        `quote-mention-${quote.id}`
-      );
-    } else if (quote) {
-      triggerDesktopNotification(
-        `[新規返信] ${quote.title}`,
-        `${currentUser.name}さんが新しく返信メッセージを投稿しました`,
-        `quote-reply-${quote.id}`
-      );
-    }
+    // Check if staff mentions exist in reply text & process auto emails + toasts
+    const newMsgId = `reply-${Date.now()}`;
+    processMentionNotificationsAndEmails({
+      contentHtml: formattedContent,
+      quote,
+      senderName: currentUser.name,
+      senderEmail: currentUser.email,
+      currentUser,
+      staffMembers: staffMembers || [],
+      msgId: newMsgId,
+    }).catch((err) => console.warn("Mention process error in thread reply:", err));
 
     onAddReply(quote.id, formattedContent, allLinks);
     setReplyText("");

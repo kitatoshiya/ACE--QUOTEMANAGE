@@ -64,6 +64,7 @@ import { ArchiveModal } from "./components/ArchiveModal";
 import { KanbanChatWindow } from "./components/KanbanChatWindow";
 import { BackgroundSettingsModal } from "./components/BackgroundSettingsModal";
 import { NotificationSettingsModal } from "./components/NotificationSettingsModal";
+import { ToastContainer } from "./components/ToastContainer";
 
 export default function App() {
   // Current user state (persisted across restarts and page reloads)
@@ -1595,6 +1596,9 @@ export default function App() {
         preferences={notificationPreferences}
         onSave={handleSaveNotificationPreferences}
       />
+
+      {/* Screen Window Toast Message Popup Notifications */}
+      <ToastContainer />
     </div>
   );
 }

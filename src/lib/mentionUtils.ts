@@ -1,5 +1,5 @@
 import { QuotationItem, StaffMember, UserProfile } from "../types";
-import { triggerDesktopNotification } from "./notificationHelper";
+import { notifyMentionReceived, notifyMentionSent } from "./toastNotifier";
 
 export interface MentionTarget {
   staffId?: string;
@@ -25,9 +25,17 @@ export function extractMentionsFromContent(
     const nameLower = staff.name.toLowerCase();
     const firstName = staff.name.split(" ")[0].toLowerCase();
 
-    // Check if email or name is prefixed with @ or mentioned in text
-    const hasAtEmail = textLower.includes(`@${emailLower}`) || textLower.includes(emailLower);
-    const hasAtName = textLower.includes(`@${nameLower}`) || textLower.includes(`@${firstName}`);
+    // Check if email or data-mention-email attribute exists
+    const hasAtEmail =
+      textLower.includes(`data-mention-email="${emailLower}"`) ||
+      textLower.includes(`@${emailLower}`) ||
+      textLower.includes(emailLower);
+
+    // Check if name is prefixed with @ or mentioned in text
+    const hasAtName =
+      textLower.includes(`@${nameLower}`) ||
+      textLower.includes(`@${firstName}`) ||
+      textLower.includes(nameLower);
 
     if (hasAtEmail || hasAtName) {
       if (!mentionedSet.has(staff.id)) {
@@ -53,7 +61,11 @@ export function isUserMentioned(
   const userNameLower = user.name.toLowerCase();
   const userFirstName = user.name.split(" ")[0].toLowerCase();
 
-  if (textLower.includes(`@${userEmailLower}`) || textLower.includes(userEmailLower)) {
+  if (
+    textLower.includes(`data-mention-email="${userEmailLower}"`) ||
+    textLower.includes(`@${userEmailLower}`) ||
+    textLower.includes(userEmailLower)
+  ) {
     return true;
   }
 
@@ -80,7 +92,7 @@ export function stripHtmlToPlainText(htmlStr: string): string {
   return temp.textContent || temp.innerText || "";
 }
 
-// Automatically trigger Desktop Notifications and Background Email sending for all mentioned recipients
+// Automatically trigger Desktop Notifications, Screen Window Toasts, and Background Email sending
 export async function processMentionNotificationsAndEmails({
   contentHtml,
   quote,
@@ -106,18 +118,34 @@ export async function processMentionNotificationsAndEmails({
   const appUrl = typeof window !== "undefined" ? window.location.origin : "";
   const msgText = stripHtmlToPlainText(contentHtml);
 
-  // 1. Trigger Desktop Notification if current logged-in user is mentioned
-  if (isUserMentioned(contentHtml, currentUser, staffMembers)) {
-    triggerDesktopNotification(
-      `🔔 [メンション通知] ${senderName || senderEmail}さんからのメッセージ`,
-      `あなた宛てにメンションが届きました:\n${msgText.slice(0, 80)}`,
-      `mention-${msgId}`
-    );
+  // 1. Trigger Window Toast Message Popup & Desktop Notification if current logged-in user is mentioned
+  if (isUserMentioned(contentHtml, currentUser, staffMembers) && senderEmail !== currentUser.email) {
+    notifyMentionReceived(senderName || senderEmail, msgText.slice(0, 100), msgId);
   }
 
-  // 2. Automatic "One-click Background Email Send" to each mentioned recipient
+  // 2. Load User's Saved Email / SMTP Settings from localStorage
+  let savedSettings: any = null;
+  try {
+    const rawSettings = localStorage.getItem(`app_email_settings_${senderEmail.toLowerCase()}`);
+    if (rawSettings) {
+      savedSettings = JSON.parse(rawSettings);
+    } else {
+      // Fallback to common key
+      const fallbackSettings = localStorage.getItem("app_email_settings_common");
+      if (fallbackSettings) savedSettings = JSON.parse(fallbackSettings);
+    }
+  } catch (e) {
+    console.warn("Could not read local email settings:", e);
+  }
+
+  const recipientNames: string[] = [];
+  let emailDispatchedCount = 0;
+  let lastErrorMessage = "";
+
+  // 3. Automatic Email Dispatch to each mentioned recipient
   for (const targetStaff of mentionedStaffs) {
     if (!targetStaff.email) continue;
+    recipientNames.push(targetStaff.name || targetStaff.email);
 
     const titleStr = quote ? quote.title : "見積案件";
     const vesselStr = quote ? quote.vesselName : "不明";
@@ -161,19 +189,38 @@ ${appUrl}
           bodyText,
           fromName: senderName,
           quoteId: quote?.id,
+          settings: savedSettings,
         }),
       });
 
       if (!resp.ok) {
         const errText = await resp.text();
+        lastErrorMessage = `HTTP ${resp.status}`;
         console.warn(`[Mention Auto Email Warning] HTTP ${resp.status} sending to ${targetStaff.email}:`, errText.slice(0, 150));
       } else {
         const resData = await resp.json();
-        console.log(`[Mention Auto Email] Background email sent to ${targetStaff.email}:`, resData);
+        if (resData.success) {
+          emailDispatchedCount++;
+          console.log(`[Mention Auto Email] Background email sent to ${targetStaff.email}:`, resData);
+        } else {
+          lastErrorMessage = resData.message || resData.error || "SMTPパスワード未設定";
+          console.warn(`[Mention Auto Email] Server returned warning:`, resData);
+        }
       }
-    } catch (err) {
+    } catch (err: any) {
+      lastErrorMessage = err?.message || "通信エラー";
       console.error(`[Mention Auto Email Error] Failed sending to ${targetStaff.email}:`, err);
     }
   }
+
+  // 4. Notify sender via Window Toast Popup
+  if (senderEmail === currentUser.email && recipientNames.length > 0) {
+    notifyMentionSent(
+      recipientNames,
+      emailDispatchedCount > 0,
+      emailDispatchedCount > 0 ? undefined : lastErrorMessage
+    );
+  }
 }
+
 
