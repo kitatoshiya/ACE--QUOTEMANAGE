@@ -92,6 +92,9 @@ export function stripHtmlToPlainText(htmlStr: string): string {
   return temp.textContent || temp.innerText || "";
 }
 
+// Deduplication tracking to prevent duplicate email dispatches
+const processedMsgIds = new Set<string>();
+
 // Automatically trigger Desktop Notifications, Screen Window Toasts, and Background Email sending
 export async function processMentionNotificationsAndEmails({
   contentHtml,
@@ -111,6 +114,16 @@ export async function processMentionNotificationsAndEmails({
   msgId: string;
 }) {
   if (!contentHtml || !staffMembers || staffMembers.length === 0) return;
+
+  // Deduplication check: guarantee each msgId is processed at most once
+  if (msgId && processedMsgIds.has(msgId)) {
+    console.log(`[Mention Auto Email] Message ${msgId} already processed. Skipping duplicate execution.`);
+    return;
+  }
+  if (msgId) {
+    processedMsgIds.add(msgId);
+    setTimeout(() => processedMsgIds.delete(msgId), 30000);
+  }
 
   const mentionedStaffs = extractMentionsFromContent(contentHtml, staffMembers);
   if (mentionedStaffs.length === 0) return;

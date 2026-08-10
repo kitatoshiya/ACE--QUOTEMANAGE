@@ -1261,6 +1261,16 @@ export default function App() {
 
     setChatMessages((prev) => [...prev, newMsg]);
 
+    // Dispatch mention notifications and email exactly once
+    processMentionNotificationsAndEmails({
+      contentHtml: content,
+      senderName: currentUser.name,
+      senderEmail: currentUser.email,
+      currentUser,
+      staffMembers,
+      msgId: newMsg.id,
+    }).catch((e) => console.warn("Mention notify error in chat:", e));
+
     if (db) {
       setDoc(doc(db, "chat_messages", newMsg.id), cleanForFirestore(newMsg)).catch((err) =>
         handleFirestoreError(err, OperationType.WRITE, `chat_messages/${newMsg.id}`)

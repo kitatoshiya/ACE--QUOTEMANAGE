@@ -523,18 +523,6 @@ export const ThreadDrawer: React.FC<ThreadDrawerProps> = ({
       }
     });
 
-    // Check if staff mentions exist in reply text & process auto emails + toasts
-    const newMsgId = `reply-${Date.now()}`;
-    processMentionNotificationsAndEmails({
-      contentHtml: formattedContent,
-      quote,
-      senderName: currentUser.name,
-      senderEmail: currentUser.email,
-      currentUser,
-      staffMembers: staffMembers || [],
-      msgId: newMsgId,
-    }).catch((err) => console.warn("Mention process error in thread reply:", err));
-
     onAddReply(quote.id, formattedContent, allLinks);
     setReplyText("");
     setReplyLinks([]);

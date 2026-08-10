@@ -364,18 +364,7 @@ export function KanbanChatWindow({
       }
     });
 
-    const newMsgId = `chat-${Date.now()}`;
     onSendMessage(trimmed, mentionedEmails);
-
-    // Process background emails & window notifications
-    processMentionNotificationsAndEmails({
-      contentHtml: trimmed,
-      senderName: currentUser.name,
-      senderEmail: currentUser.email,
-      currentUser,
-      staffMembers,
-      msgId: newMsgId,
-    }).catch((e) => console.warn("Mention notify error:", e));
 
     setInputText("");
     setShowMentionMenu(false);
