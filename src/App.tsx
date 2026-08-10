@@ -66,11 +66,31 @@ import { BackgroundSettingsModal } from "./components/BackgroundSettingsModal";
 import { NotificationSettingsModal } from "./components/NotificationSettingsModal";
 
 export default function App() {
-  // Current user state
-  const [currentUser, setCurrentUser] = useState<UserProfile>({
-    name: "山田 太郎 (営業)",
-    email: "yamada.sales@marinetrade.co.jp",
+  // Current user state (persisted across restarts and page reloads)
+  const [currentUser, setCurrentUser] = useState<UserProfile>(() => {
+    const saved = localStorage.getItem("app_current_user");
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (parsed && parsed.email) {
+          return parsed;
+        }
+      } catch (e) {
+        // ignore
+      }
+    }
+    return {
+      name: "山田 太郎 (営業)",
+      email: "yamada.sales@marinetrade.co.jp",
+    };
   });
+
+  // Sync current user state to localStorage
+  useEffect(() => {
+    if (currentUser?.email) {
+      localStorage.setItem("app_current_user", JSON.stringify(currentUser));
+    }
+  }, [currentUser]);
 
   // App Theme state
   const [theme, setTheme] = useState<AppTheme>(() => {
@@ -79,7 +99,14 @@ export default function App() {
 
   // Per-user Background state (managed individually per login ID)
   const [appBackground, setAppBackground] = useState<AppBackground>(() => {
-    const initialUserEmail = "yamada.sales@marinetrade.co.jp";
+    let initialUserEmail = "yamada.sales@marinetrade.co.jp";
+    const savedUserStr = localStorage.getItem("app_current_user");
+    if (savedUserStr) {
+      try {
+        const parsed = JSON.parse(savedUserStr);
+        if (parsed?.email) initialUserEmail = parsed.email.toLowerCase();
+      } catch (e) {}
+    }
     const saved = localStorage.getItem(`app_background_${initialUserEmail}`);
     if (saved) {
       try {
@@ -101,7 +128,14 @@ export default function App() {
 
   // Per-user Notification Preferences state
   const [notificationPreferences, setNotificationPreferences] = useState<NotificationPreferences>(() => {
-    const initialUserEmail = "yamada.sales@marinetrade.co.jp";
+    let initialUserEmail = "yamada.sales@marinetrade.co.jp";
+    const savedUserStr = localStorage.getItem("app_current_user");
+    if (savedUserStr) {
+      try {
+        const parsed = JSON.parse(savedUserStr);
+        if (parsed?.email) initialUserEmail = parsed.email.toLowerCase();
+      } catch (e) {}
+    }
     const saved = localStorage.getItem(`notification_prefs_${initialUserEmail}`);
     if (saved) {
       try {
@@ -223,7 +257,14 @@ export default function App() {
 
   // Per-user Active View / Screen Mode state (managed individually per logged-in user in Firestore)
   const [activeView, setActiveView] = useState<ActiveView>(() => {
-    const initialUserEmail = "yamada.sales@marinetrade.co.jp";
+    let initialUserEmail = "yamada.sales@marinetrade.co.jp";
+    const savedUserStr = localStorage.getItem("app_current_user");
+    if (savedUserStr) {
+      try {
+        const parsed = JSON.parse(savedUserStr);
+        if (parsed?.email) initialUserEmail = parsed.email.toLowerCase();
+      } catch (e) {}
+    }
     const saved = localStorage.getItem(`app_active_view_${initialUserEmail}`);
     if (saved && (saved === "kanban" || saved === "sticky_board" || saved === "email")) {
       return saved as ActiveView;
@@ -621,6 +662,7 @@ export default function App() {
         console.warn("Sign out error:", e);
       }
     }
+    localStorage.removeItem("app_current_user");
     setIsAuthModalOpen(true);
   };
 

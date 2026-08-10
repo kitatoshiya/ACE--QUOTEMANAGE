@@ -164,8 +164,13 @@ ${appUrl}
         }),
       });
 
-      const resData = await resp.json();
-      console.log(`[Mention Auto Email] Background email sent to ${targetStaff.email}:`, resData);
+      if (!resp.ok) {
+        const errText = await resp.text();
+        console.warn(`[Mention Auto Email Warning] HTTP ${resp.status} sending to ${targetStaff.email}:`, errText.slice(0, 150));
+      } else {
+        const resData = await resp.json();
+        console.log(`[Mention Auto Email] Background email sent to ${targetStaff.email}:`, resData);
+      }
     } catch (err) {
       console.error(`[Mention Auto Email Error] Failed sending to ${targetStaff.email}:`, err);
     }
