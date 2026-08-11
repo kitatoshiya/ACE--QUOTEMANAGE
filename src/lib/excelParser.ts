@@ -4,49 +4,83 @@
 export function convertTsvToHtmlTable(text: string): string {
   if (!text || typeof text !== "string") return "";
 
-  // Check if text contains tabs (Excel paste)
+  // If text has no tabs and no newlines, escape and return
   if (!text.includes("\t") && !text.includes("\n")) {
     return escapeHtml(text);
   }
 
-  const lines = text.trim().split(/\r?\n/);
-  if (lines.length === 0) return escapeHtml(text);
+  const rawLines = text.split(/\r?\n/);
+  if (rawLines.length === 0) return escapeHtml(text);
 
   // Check if at least one line contains tab
-  const hasTabs = lines.some((line) => line.includes("\t"));
+  const hasTabs = rawLines.some((line) => line.includes("\t"));
   if (!hasTabs) {
     // Return standard text formatted with paragraphs/linebreaks
-    return text
-      .split(/\r?\n/)
-      .map((line) => `<p class="my-1">${escapeHtml(line)}</p>`)
+    return rawLines
+      .map((line) => (line.trim() === "" ? "<br>" : `<p class="my-1 text-slate-900" style="color: #0f172a; margin-top: 0.25rem; margin-bottom: 0.25rem;">${escapeHtml(line)}</p>`))
       .join("");
   }
 
-  let tableHtml = `<div class="overflow-x-auto my-3 rounded-lg border-2 border-slate-300 bg-white shadow-sm"><table class="excel-table w-full text-xs text-left border-collapse" style="border-collapse: collapse; border: 2px solid #cbd5e1; background-color: #ffffff;">`;
+  type Chunk = { type: "text"; lines: string[] } | { type: "table"; lines: string[] };
+  const chunks: Chunk[] = [];
+  let currentChunk: Chunk | null = null;
 
-  lines.forEach((line, rowIndex) => {
-    const cells = line.split("\t");
-    const isHeader = rowIndex === 0;
+  for (let i = 0; i < rawLines.length; i++) {
+    const line = rawLines[i];
+    const isTableLine = line.includes("\t");
 
-    tableHtml += `<tr class="${
-      isHeader
-        ? "bg-slate-200 text-slate-900 font-bold border-b-2 border-slate-400"
-        : rowIndex % 2 === 0
-        ? "bg-white border-b border-slate-300"
-        : "bg-slate-50 border-b border-slate-300"
-    }" style="background-color: ${isHeader ? '#e2e8f0' : rowIndex % 2 === 0 ? '#ffffff' : '#f8fafc'};">`;
+    if (isTableLine) {
+      if (currentChunk && currentChunk.type === "table") {
+        currentChunk.lines.push(line);
+      } else {
+        if (currentChunk) chunks.push(currentChunk);
+        currentChunk = { type: "table", lines: [line] };
+      }
+    } else {
+      if (currentChunk && currentChunk.type === "text") {
+        currentChunk.lines.push(line);
+      } else {
+        if (currentChunk) chunks.push(currentChunk);
+        currentChunk = { type: "text", lines: [line] };
+      }
+    }
+  }
+  if (currentChunk) chunks.push(currentChunk);
 
-    cells.forEach((cellText) => {
-      const escaped = escapeHtml(cellText.trim());
-      const cellTag = isHeader ? "th" : "td";
-      tableHtml += `<${cellTag} class="px-3 py-2 border border-slate-300 text-slate-900 whitespace-nowrap" style="border: 1px solid #cbd5e1; background-color: inherit; color: #0f172a;">${escaped || "&nbsp;"}</${cellTag}>`;
-    });
+  let resultHtml = "";
 
-    tableHtml += `</tr>`;
+  chunks.forEach((chunk) => {
+    if (chunk.type === "text") {
+      // Process plain text lines outside tables
+      chunk.lines.forEach((line) => {
+        if (line.trim() === "") {
+          resultHtml += "<br>";
+        } else {
+          resultHtml += `<p class="my-1 text-slate-900" style="color: #0f172a; margin-top: 0.25rem; margin-bottom: 0.25rem;">${escapeHtml(line)}</p>`;
+        }
+      });
+    } else if (chunk.type === "table") {
+      // Process table block (tabbed lines) with uniform clean borders and white background (no title row shading)
+      let tableHtml = `<div class="overflow-x-auto my-3 rounded-lg border border-slate-300 bg-white shadow-xs"><table class="excel-table w-full text-xs text-left border-collapse" style="border-collapse: collapse; border: 1px solid #cbd5e1; background-color: #ffffff;"><tbody>`;
+
+      chunk.lines.forEach((line) => {
+        const cells = line.split("\t");
+        tableHtml += `<tr class="bg-white border-b border-slate-300" style="background-color: #ffffff;">`;
+
+        cells.forEach((cellText) => {
+          const escaped = escapeHtml(cellText.trim());
+          tableHtml += `<td class="px-3 py-1.5 border border-slate-300 text-slate-900 whitespace-nowrap" style="border: 1px solid #cbd5e1; background-color: #ffffff; color: #0f172a;">${escaped || "&nbsp;"}</td>`;
+        });
+
+        tableHtml += `</tr>`;
+      });
+
+      tableHtml += `</tbody></table></div>`;
+      resultHtml += tableHtml;
+    }
   });
 
-  tableHtml += `</table></div>`;
-  return tableHtml;
+  return resultHtml;
 }
 
 function escapeHtml(str: string): string {
