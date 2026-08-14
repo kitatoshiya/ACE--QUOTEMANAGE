@@ -53,7 +53,7 @@ import { KanbanBoard, KANBAN_COLUMNS } from "./components/KanbanBoard";
 import { StickyBoard } from "./components/StickyBoard";
 import { EmailClient } from "./components/EmailClient";
 import { isUserMentioned, processMentionNotificationsAndEmails, stripHtmlToPlainText } from "./lib/mentionUtils";
-import { triggerDesktopNotification } from "./lib/notificationHelper";
+import { formatNotificationTimestamp, isEventAlreadyNotified, markEventAsNotified, triggerDesktopNotification } from "./lib/notificationHelper";
 import { NewQuoteModal } from "./components/NewQuoteModal";
 import { ThreadDrawer } from "./components/ThreadDrawer";
 import { BackupRestoreModal } from "./components/BackupRestoreModal";
@@ -456,6 +456,8 @@ export default function App() {
   }, []);
 
   // 2. Real-time Firestore Sync for Quotations
+  const previousQuotesRef = React.useRef<QuotationItem[]>([]);
+
   useEffect(() => {
     if (!db) return;
     const colRef = collection(db, "quotations");
@@ -477,6 +479,38 @@ export default function App() {
           remoteQuotes.sort(
             (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
           );
+
+          if (previousQuotesRef.current.length > 0) {
+            snapshot.docChanges().forEach((change) => {
+              if (change.type === "modified") {
+                const updated = change.doc.data() as QuotationItem;
+                const prev = previousQuotesRef.current.find((q) => q.id === updated.id);
+                if (prev && prev.status !== updated.status) {
+                  const statusKey = updated.status as keyof NotificationPreferences["notifyOnStatusChanges"];
+                  const tag = `status-${updated.id}-${updated.status}-${updated.updatedAt || ""}`;
+                  if (shouldNotifyForQuoteEvent(updated, statusKey, undefined, updated.updatedBy) && !isEventAlreadyNotified(tag)) {
+                    const newStatusCol = KANBAN_COLUMNS.find((c) => c.id === updated.status);
+                    const timeStr = formatNotificationTimestamp(updated.updatedAt || new Date());
+                    triggerDesktopNotification(
+                      `📌 [ステータス変更] ${updated.vesselName} (${updated.title})`,
+                      `【${newStatusCol?.title || updated.status}】に変更されました\n【発信時刻: ${timeStr}】`,
+                      tag
+                    );
+                  }
+                }
+              }
+            });
+          } else {
+            // Initial snapshot: mark current status of all existing quotes as already notified
+            snapshot.forEach((d) => {
+              const qData = d.data() as QuotationItem;
+              if (qData.id && qData.status) {
+                markEventAsNotified(`status-${qData.id}-${qData.status}-${qData.updatedAt || ""}`);
+              }
+            });
+          }
+
+          previousQuotesRef.current = remoteQuotes;
           setQuotes(remoteQuotes);
           saveLocalQuotes(remoteQuotes);
         }
@@ -486,13 +520,12 @@ export default function App() {
       }
     );
     return () => unsubscribe();
-  }, []);
-
-  const isInitialMessagesLoad = React.useRef(true);
+  }, [currentUser, staffMembers, notificationPreferences, messages]);
 
   // 3. Real-time Firestore Sync for Messages
   useEffect(() => {
     if (!db) return;
+    let isFirstSnapshot = true;
     const colRef = collection(db, "messages");
     const unsubscribe = onSnapshot(
       colRef,
@@ -508,28 +541,47 @@ export default function App() {
           saveLocalMessages(INITIAL_SAMPLE_MESSAGES);
         } else {
           const remoteMsgs: QuoteMessage[] = [];
-          snapshot.forEach((d) => remoteMsgs.push(d.data() as QuoteMessage));
+          snapshot.forEach((d) => {
+            const msgData = d.data() as QuoteMessage;
+            remoteMsgs.push(msgData);
+            // On initial snapshot, mark existing messages as already notified persistently
+            markEventAsNotified(msgData.id);
+            markEventAsNotified(`mention-${msgData.id}`);
+          });
+
           remoteMsgs.sort(
             (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
           );
 
-          if (!isInitialMessagesLoad.current) {
+          if (!isFirstSnapshot) {
             snapshot.docChanges().forEach((change) => {
               if (change.type === "added") {
                 const newMsg = change.doc.data() as QuoteMessage;
-                if (isUserMentioned(newMsg.contentHtml, currentUser, staffMembers)) {
-                  triggerDesktopNotification(
-                    `🔔 [メンション通知] ${newMsg.authorName || newMsg.authorEmail}さんからのメッセージ`,
-                    `あなた宛てにメンションが届きました:\n${stripHtmlToPlainText(newMsg.contentHtml).slice(0, 80)}`,
-                    `mention-${newMsg.id}`
-                  );
+                // Exclude system logs (status change messages) from triggering mention notifications
+                if (newMsg.isSystemLog) return;
+                if (isEventAlreadyNotified(newMsg.id) || isEventAlreadyNotified(`mention-${newMsg.id}`)) return;
+
+                if (
+                  isUserMentioned(newMsg.contentHtml, currentUser, staffMembers) &&
+                  newMsg.authorEmail?.toLowerCase() !== currentUser.email?.toLowerCase()
+                ) {
+                  markEventAsNotified(newMsg.id);
+                  markEventAsNotified(`mention-${newMsg.id}`);
+
+                  if (notificationPreferences.desktopEnabled && notificationPreferences.notifyOnMentions) {
+                    const timeStr = formatNotificationTimestamp(newMsg.createdAt);
+                    triggerDesktopNotification(
+                      `🔔 [メンション通知] ${newMsg.authorName || newMsg.authorEmail}さんからのメッセージ`,
+                      `あなた宛てにメンションが届きました:\n${stripHtmlToPlainText(newMsg.contentHtml).slice(0, 80)}\n【発信時刻: ${timeStr}】`,
+                      `mention-${newMsg.id}`
+                    );
+                  }
                 }
               }
             });
-          } else {
-            isInitialMessagesLoad.current = false;
           }
 
+          isFirstSnapshot = false;
           setMessages(remoteMsgs);
           saveLocalMessages(remoteMsgs);
         }
@@ -539,7 +591,7 @@ export default function App() {
       }
     );
     return () => unsubscribe();
-  }, [currentUser, staffMembers]);
+  }, [currentUser, staffMembers, notificationPreferences]);
 
   // 3b. Real-time Firestore Sync for Kanban Chat Messages
   useEffect(() => {
@@ -558,7 +610,12 @@ export default function App() {
           saveLocalChatMessages(INITIAL_SAMPLE_CHAT_MESSAGES);
         } else {
           const remoteChatMsgs: ChatMessage[] = [];
-          snapshot.forEach((d) => remoteChatMsgs.push(d.data() as ChatMessage));
+          snapshot.forEach((d) => {
+            const chatMsg = d.data() as ChatMessage;
+            remoteChatMsgs.push(chatMsg);
+            markEventAsNotified(chatMsg.id);
+            markEventAsNotified(`chat-mention-${chatMsg.id}`);
+          });
           remoteChatMsgs.sort(
             (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
           );
@@ -846,9 +903,17 @@ export default function App() {
   const shouldNotifyForQuoteEvent = (
     quote: QuotationItem,
     eventKey: keyof NotificationPreferences["notifyOnStatusChanges"],
-    customMessages?: QuoteMessage[]
+    customMessages?: QuoteMessage[],
+    actorEmail?: string
   ): boolean => {
     if (!notificationPreferences.desktopEnabled) return false;
+
+    // Do not notify the user who performed the action themselves
+    const activeActorEmail = actorEmail || quote.updatedBy;
+    if (activeActorEmail && activeActorEmail.toLowerCase() === currentUser.email.toLowerCase()) {
+      return false;
+    }
+
     const isEventEnabled = Boolean(notificationPreferences.notifyOnStatusChanges[eventKey]);
     if (!isEventEnabled) return false;
 
@@ -884,16 +949,18 @@ export default function App() {
       isArchived: true,
       archivedAt: nowIso,
       updatedAt: nowIso,
+      updatedBy: currentUser.email,
     };
     setQuotes((prev) =>
       prev.map((q) => (q.id === quoteId ? archivedQuote : q))
     );
 
-    if (shouldNotifyForQuoteEvent(archivedQuote, "archived")) {
+    if (shouldNotifyForQuoteEvent(archivedQuote, "archived", undefined, currentUser.email)) {
+      const timeStr = formatNotificationTimestamp(nowIso);
       triggerDesktopNotification(
         `📦 [アーカイブ] ${target.vesselName} (${target.title})`,
-        `タスクがアーカイブされました (操作者: ${currentUser.name})`,
-        `archive-${quoteId}`
+        `タスクがアーカイブされました (操作者: ${currentUser.name})\n【発信時刻: ${timeStr}】`,
+        `archive-${quoteId}-${nowIso}`
       );
     }
 
@@ -985,6 +1052,7 @@ export default function App() {
       isUrgent: email.labels?.includes("緊急") || email.subject.includes("緊急"),
       status: "requested",
       createdBy: currentUser.email,
+      updatedBy: currentUser.email,
       createdAt: nowIso,
       updatedAt: nowIso,
       lastRepliedAt: nowIso,
@@ -1005,9 +1073,10 @@ export default function App() {
     setSelectedQuoteId(newQuoteId);
 
     if (shouldNotifyForQuoteEvent(newQuote, "requested", [initialMessage])) {
+      const timeStr = formatNotificationTimestamp(nowIso);
       triggerDesktopNotification(
         `📥 [新規タスク追加] ${newQuote.vesselName} (${newQuote.title})`,
-        `【見積依頼】に新規タスクが追加されました (受信メールより自動作成)`,
+        `【見積依頼】に新規タスクが追加されました (受信メールより自動作成)\n【発信時刻: ${timeStr}】`,
         `create-${newQuoteId}`
       );
     }
@@ -1039,6 +1108,8 @@ export default function App() {
     const createdQuote: QuotationItem = {
       ...newQuoteData,
       id: newId,
+      createdBy: currentUser.email,
+      updatedBy: currentUser.email,
       createdAt: nowIso,
       updatedAt: nowIso,
       lastRepliedAt: nowIso,
@@ -1061,11 +1132,12 @@ export default function App() {
 
     // Trigger Desktop Notification for task creation in column if configured
     const initialStatusKey = createdQuote.status as keyof NotificationPreferences["notifyOnStatusChanges"];
-    if (shouldNotifyForQuoteEvent(createdQuote, initialStatusKey, [initialMessage])) {
+    if (shouldNotifyForQuoteEvent(createdQuote, initialStatusKey, [initialMessage], currentUser.email)) {
       const colTitle = KANBAN_COLUMNS.find((c) => c.id === createdQuote.status)?.title || createdQuote.status;
+      const timeStr = formatNotificationTimestamp(nowIso);
       triggerDesktopNotification(
         `📌 [新規タスク追加] ${createdQuote.vesselName} (${createdQuote.title})`,
-        `【${colTitle}】に新規タスクが追加されました (作成者: ${currentUser.name})`,
+        `【${colTitle}】に新規タスクが追加されました (作成者: ${currentUser.name})\n【発信時刻: ${timeStr}】`,
         `create-${newId}`
       );
     }
@@ -1117,6 +1189,7 @@ export default function App() {
       ...target,
       status: newStatus,
       updatedAt: nowIso,
+      updatedBy: currentUser.email,
       readBy: [currentUser.email], // Unread for other users when status changes!
     };
 
@@ -1126,11 +1199,12 @@ export default function App() {
 
     // Trigger Desktop Notification based on Notification Preferences
     const statusKey = newStatus as keyof NotificationPreferences["notifyOnStatusChanges"];
-    if (shouldNotifyForQuoteEvent(updatedQuote, statusKey)) {
+    if (shouldNotifyForQuoteEvent(updatedQuote, statusKey, undefined, currentUser.email)) {
+      const timeStr = formatNotificationTimestamp(nowIso);
       triggerDesktopNotification(
         `📌 [ステータス変更] ${target.vesselName} (${target.title})`,
-        `【${newStatusCol?.title || newStatus}】に変更されました (更新者: ${currentUser.name})`,
-        `status-${quoteId}`
+        `【${newStatusCol?.title || newStatus}】に変更されました (更新者: ${currentUser.name})\n【発信時刻: ${timeStr}】`,
+        `status-${quoteId}-${newStatus}-${nowIso}`
       );
     }
 

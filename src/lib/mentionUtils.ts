@@ -1,4 +1,5 @@
 import { QuotationItem, StaffMember, UserProfile } from "../types";
+import { isEventAlreadyNotified, markEventAsNotified } from "./notificationHelper";
 import { notifyMentionReceived, notifyMentionSent } from "./toastNotifier";
 
 export interface MentionTarget {
@@ -25,17 +26,15 @@ export function extractMentionsFromContent(
     const nameLower = staff.name.toLowerCase();
     const firstName = staff.name.split(" ")[0].toLowerCase();
 
-    // Check if email or data-mention-email attribute exists
+    // Check if email or data-mention-email attribute exists with explicit @ or mention badge
     const hasAtEmail =
       textLower.includes(`data-mention-email="${emailLower}"`) ||
-      textLower.includes(`@${emailLower}`) ||
-      textLower.includes(emailLower);
+      textLower.includes(`@${emailLower}`);
 
-    // Check if name is prefixed with @ or mentioned in text
+    // Check if name is prefixed with @
     const hasAtName =
-      textLower.includes(`@${nameLower}`) ||
-      textLower.includes(`@${firstName}`) ||
-      textLower.includes(nameLower);
+      (nameLower && textLower.includes(`@${nameLower}`)) ||
+      (firstName && textLower.includes(`@${firstName}`));
 
     if (hasAtEmail || hasAtName) {
       if (!mentionedSet.has(staff.id)) {
@@ -63,13 +62,15 @@ export function isUserMentioned(
 
   if (
     textLower.includes(`data-mention-email="${userEmailLower}"`) ||
-    textLower.includes(`@${userEmailLower}`) ||
-    textLower.includes(userEmailLower)
+    textLower.includes(`@${userEmailLower}`)
   ) {
     return true;
   }
 
-  if (textLower.includes(`@${userNameLower}`) || textLower.includes(`@${userFirstName}`)) {
+  if (
+    (userNameLower && textLower.includes(`@${userNameLower}`)) ||
+    (userFirstName && textLower.includes(`@${userFirstName}`))
+  ) {
     return true;
   }
 
@@ -115,13 +116,15 @@ export async function processMentionNotificationsAndEmails({
 }) {
   if (!contentHtml || !staffMembers || staffMembers.length === 0) return;
 
-  // Deduplication check: guarantee each msgId is processed at most once
-  if (msgId && processedMsgIds.has(msgId)) {
+  // Deduplication check: guarantee each msgId is processed at most once (persistently across restarts)
+  if (msgId && (processedMsgIds.has(msgId) || isEventAlreadyNotified(msgId) || isEventAlreadyNotified(`mention-${msgId}`))) {
     console.log(`[Mention Auto Email] Message ${msgId} already processed. Skipping duplicate execution.`);
     return;
   }
   if (msgId) {
     processedMsgIds.add(msgId);
+    markEventAsNotified(msgId);
+    markEventAsNotified(`mention-${msgId}`);
     setTimeout(() => processedMsgIds.delete(msgId), 30000);
   }
 
@@ -131,9 +134,12 @@ export async function processMentionNotificationsAndEmails({
   const appUrl = typeof window !== "undefined" ? window.location.origin : "";
   const msgText = stripHtmlToPlainText(contentHtml);
 
-  // 1. Trigger Window Toast Message Popup & Desktop Notification if current logged-in user is mentioned
-  if (isUserMentioned(contentHtml, currentUser, staffMembers) && senderEmail !== currentUser.email) {
-    notifyMentionReceived(senderName || senderEmail, msgText.slice(0, 100), msgId);
+  // 1. Trigger Window Toast Message Popup & Desktop Notification if current logged-in user is mentioned (ignore self-mentions)
+  if (
+    isUserMentioned(contentHtml, currentUser, staffMembers) &&
+    senderEmail?.toLowerCase() !== currentUser.email?.toLowerCase()
+  ) {
+    notifyMentionReceived(senderName || senderEmail, msgText.slice(0, 100), msgId, new Date());
   }
 
   // 2. Load User's Saved Email / SMTP Settings from localStorage

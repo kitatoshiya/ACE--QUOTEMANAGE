@@ -159,6 +159,7 @@ export interface QuotationItem {
   createdBy: string;
   createdAt: string; // ISO string
   updatedAt: string; // ISO string
+  updatedBy?: string; // メールアドレス/ユーザー識別子
   lastRepliedAt: string; // ISO string
   readBy: string[]; // List of user emails who have read the latest update
   externalLinks?: ExternalLink[];

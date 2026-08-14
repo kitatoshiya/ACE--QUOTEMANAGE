@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import { ChatMessage, ChatWindowState, ChatTypingStatus, StaffMember, UserProfile } from "../types";
 import { isUserMentioned, processMentionNotificationsAndEmails } from "../lib/mentionUtils";
-import { triggerDesktopNotification } from "../lib/notificationHelper";
+import { formatNotificationTimestamp, isEventAlreadyNotified, markEventAsNotified, triggerDesktopNotification } from "../lib/notificationHelper";
 
 interface KanbanChatWindowProps {
   currentUser: UserProfile;
@@ -202,22 +202,40 @@ export function KanbanChatWindow({
 
   // --- Track Notified Message IDs for Browser Notification ---
   const notifiedIdsRef = useRef<Set<string>>(new Set());
+  const isInitialChatLoadRef = useRef(true);
 
   useEffect(() => {
+    if (isInitialChatLoadRef.current) {
+      // Mark all current chat messages as already processed so opening window / restarting app doesn't re-notify
+      activeChatMessages.forEach((msg) => {
+        notifiedIdsRef.current.add(msg.id);
+        markEventAsNotified(msg.id);
+        markEventAsNotified(`chat-mention-${msg.id}`);
+      });
+      isInitialChatLoadRef.current = false;
+      return;
+    }
+
     activeChatMessages.forEach((msg) => {
+      const tag = `chat-mention-${msg.id}`;
       // If author is someone else, user is mentioned, and message is not yet notified
       if (
-        msg.authorEmail !== currentUser.email &&
+        msg.authorEmail?.toLowerCase() !== currentUser.email?.toLowerCase() &&
         !notifiedIdsRef.current.has(msg.id) &&
+        !isEventAlreadyNotified(msg.id) &&
+        !isEventAlreadyNotified(tag) &&
         isUserMentioned(msg.content, currentUser, staffMembers)
       ) {
         notifiedIdsRef.current.add(msg.id);
+        markEventAsNotified(msg.id);
+        markEventAsNotified(tag);
 
         // Trigger browser notification (NO email sent for chat mentions as per requirement)
+        const timeStr = formatNotificationTimestamp(msg.createdAt);
         triggerDesktopNotification(
           `🔔 [チャット] ${msg.authorName || msg.authorEmail}さんからのメンション`,
-          msg.content.replace(/<[^>]*>/g, "").slice(0, 100),
-          `chat-mention-${msg.id}`
+          `${msg.content.replace(/<[^>]*>/g, "").slice(0, 100)}\n【発信時刻: ${timeStr}】`,
+          tag
         );
       }
     });

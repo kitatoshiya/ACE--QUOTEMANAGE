@@ -1,5 +1,5 @@
 // Toast / Window Message Notification Engine for Mention & Email events
-import { playNotificationSound, triggerDesktopNotification } from "./notificationHelper";
+import { formatNotificationTimestamp, isEventAlreadyNotified, markEventAsNotified, playNotificationSound, triggerDesktopNotification } from "./notificationHelper";
 
 export interface ToastMessage {
   id: string;
@@ -80,9 +80,19 @@ class ToastManager {
 export const toastNotifier = new ToastManager();
 
 // Helper to trigger both Window Toast Popup AND Browser Desktop Notification
-export function notifyMentionReceived(senderName: string, messageSnippet: string, msgId?: string) {
+export function notifyMentionReceived(senderName: string, messageSnippet: string, msgId?: string, timestampInput?: string | number | Date) {
+  if (msgId) {
+    if (isEventAlreadyNotified(msgId) || isEventAlreadyNotified(`mention-${msgId}`)) {
+      return;
+    }
+    markEventAsNotified(msgId);
+    markEventAsNotified(`mention-${msgId}`);
+  }
+
+  const timeStr = formatNotificationTimestamp(timestampInput);
   const title = `🔔 [メンション通知] ${senderName}さんからのメッセージ`;
-  const body = messageSnippet || "あなた宛てにメンションが届きました。";
+  const snippet = messageSnippet || "あなた宛てにメンションが届きました。";
+  const body = `${snippet}\n【発信時刻: ${timeStr}】`;
 
   // 1. Show Screen Window Message Popup (Toast)
   toastNotifier.show({

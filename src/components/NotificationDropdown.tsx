@@ -82,6 +82,10 @@ export const NotificationDropdown: React.FC<NotificationDropdownProps> = ({
       const parentQuote = quotes.find((q) => q.id === msg.quoteId);
       if (!parentQuote || parentQuote.isArchived) return;
 
+      // Exclude messages authored by the current logged-in user and system status logs
+      if (msg.authorEmail?.toLowerCase() === currentUser.email.toLowerCase()) return;
+      if (msg.isSystemLog) return;
+
       const mentioned = isUserMentioned(msg.contentHtml, currentUser, staffMembers);
       const isAssigned = parentQuote.assignedStaffId &&
         staffMembers.find((s) => s.id === parentQuote.assignedStaffId)?.email.toLowerCase() === currentUser.email.toLowerCase();
