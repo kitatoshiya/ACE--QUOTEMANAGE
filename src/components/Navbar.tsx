@@ -24,6 +24,7 @@ import {
   Mail as MailIcon,
   Image as ImageIcon,
   Bell,
+  Play,
   SlidersHorizontal,
 } from "lucide-react";
 import { ActiveView, AppTheme, FilterOptions, QuotationItem, QuoteMessage, StaffMember, UserProfile } from "../types";
@@ -48,6 +49,7 @@ interface NavbarProps {
   onOpenArchiveModal?: () => void;
   onOpenBgSettings?: () => void;
   onOpenNotificationSettings?: () => void;
+  onShowSplash?: () => void;
   onLogout?: () => void;
   onSelectQuote: (quote: QuotationItem) => void;
   totalQuotesCount: number;
@@ -73,6 +75,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenArchiveModal,
   onOpenBgSettings,
   onOpenNotificationSettings,
+  onShowSplash,
   onLogout,
   onSelectQuote,
   totalQuotesCount,
@@ -131,8 +134,12 @@ export const Navbar: React.FC<NavbarProps> = ({
       <div className="w-full px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16 gap-4">
           {/* Logo & Title */}
-          <div className="flex items-center gap-3 shrink-0">
-            <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-white shadow-md transition-all ${
+          <div
+            onClick={onShowSplash}
+            title="起動スプラッシュ画面を表示"
+            className="flex items-center gap-3 shrink-0 cursor-pointer group hover:opacity-95 transition-opacity"
+          >
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-white shadow-md transition-all group-hover:scale-105 ${
               currentTheme === "cute"
                 ? "bg-gradient-to-tr from-pink-400 to-rose-400 shadow-pink-300"
                 : currentTheme === "digital"
@@ -284,6 +291,13 @@ export const Navbar: React.FC<NavbarProps> = ({
                 className="p-1.5 border border-slate-700 rounded-lg bg-slate-900 text-slate-300 hover:text-white transition-colors"
               >
                 <ImageIcon className="w-4 h-4" />
+              </button>
+              <button
+                onClick={onShowSplash}
+                title="起動スプラッシュ画面を再生"
+                className="p-1.5 border border-slate-700 rounded-lg bg-slate-900 text-cyan-400 hover:text-cyan-300 hover:bg-slate-800 transition-colors"
+              >
+                <Play className="w-4 h-4" />
               </button>
               <button
                 onClick={onOpenNotificationSettings}

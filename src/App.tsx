@@ -65,8 +65,13 @@ import { KanbanChatWindow } from "./components/KanbanChatWindow";
 import { BackgroundSettingsModal } from "./components/BackgroundSettingsModal";
 import { NotificationSettingsModal } from "./components/NotificationSettingsModal";
 import { ToastContainer } from "./components/ToastContainer";
+import { SplashScreen } from "./components/SplashScreen";
+import { AnimatePresence } from "motion/react";
 
 export default function App() {
+  // Splash Screen initial state (displays on startup)
+  const [showSplash, setShowSplash] = useState<boolean>(true);
+
   // Current user state (persisted across restarts and page reloads)
   const [currentUser, setCurrentUser] = useState<UserProfile>(() => {
     const saved = localStorage.getItem("app_current_user");
@@ -1498,6 +1503,7 @@ export default function App() {
           onOpenArchiveModal={() => setIsArchiveOpen(true)}
           onOpenBgSettings={() => setIsBgSettingsOpen(true)}
           onOpenNotificationSettings={() => setIsNotificationSettingsOpen(true)}
+          onShowSplash={() => setShowSplash(true)}
           onLogout={handleLogout}
           onSelectQuote={(q) => setSelectedQuoteId(q.id)}
           totalQuotesCount={activeQuotes.length}
@@ -1683,6 +1689,23 @@ export default function App() {
 
       {/* Screen Window Toast Message Popup Notifications */}
       <ToastContainer />
+
+      {/* Startup & Interactive Splash Screen (Modal Popup) */}
+      <AnimatePresence>
+        {showSplash && (
+          <SplashScreen
+            onFinish={() => setShowSplash(false)}
+            statusCounts={{
+              requested: activeQuotes.filter((q) => q.status === "requested").length,
+              estimated: activeQuotes.filter((q) => q.status === "estimated").length,
+              re_estimating: activeQuotes.filter((q) => q.status === "re_estimating").length,
+              accepted: activeQuotes.filter((q) => q.status === "accepted").length,
+              closed_or_on_hold: activeQuotes.filter((q) => q.status === "closed_or_on_hold").length,
+              totalActive: activeQuotes.length,
+            }}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }
