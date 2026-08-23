@@ -3,6 +3,7 @@ import {
   X,
   Ship,
   Plane,
+  Scale,
   AlertTriangle,
   Link2,
   Plus,
@@ -10,7 +11,7 @@ import {
   CheckCircle2,
   UserCheck,
 } from "lucide-react";
-import { ExternalLink, QuotationItem, QuoteStatus, StaffMember, UserProfile } from "../types";
+import { ExternalLink, QuotationItem, QuoteStatus, StaffMember, UserProfile, WeightBreak, WEIGHT_BREAK_OPTIONS } from "../types";
 import { convertTsvToHtmlTable } from "../lib/excelParser";
 import { isValidIataCode } from "../lib/iataAirports";
 import { processMentionNotificationsAndEmails } from "../lib/mentionUtils";
@@ -40,6 +41,7 @@ export const NewQuoteModal: React.FC<NewQuoteModalProps> = ({
   const [title, setTitle] = useState("");
   const [vesselName, setVesselName] = useState("");
   const [airportCodesInput, setAirportCodesInput] = useState("");
+  const [weightBreak, setWeightBreak] = useState<WeightBreak | "">("");
   const [customsClearanceDate, setCustomsClearanceDate] = useState("");
   const [isUrgent, setIsUrgent] = useState(false);
   const [status, setStatus] = useState<QuoteStatus>(initialStatus);
@@ -119,6 +121,7 @@ export const NewQuoteModal: React.FC<NewQuoteModalProps> = ({
         title: title.trim(),
         vesselName: vesselName.trim() || "未指定",
         airportCodes: cleanAirports.length > 0 ? cleanAirports : ["SIN"],
+        weightBreak: weightBreak || undefined,
         customsClearanceDate: customsClearanceDate.trim() || undefined,
         grossWeight: customsClearanceDate.trim() || undefined,
         isUrgent,
@@ -134,6 +137,7 @@ export const NewQuoteModal: React.FC<NewQuoteModalProps> = ({
     setTitle("");
     setVesselName("");
     setAirportCodesInput("");
+    setWeightBreak("");
     setCustomsClearanceDate("");
     setIsUrgent(false);
     setAssignedStaffId("");
@@ -170,9 +174,9 @@ export const NewQuoteModal: React.FC<NewQuoteModalProps> = ({
         {/* Modal Body */}
         <div className="p-6 overflow-y-auto space-y-5 text-xs text-slate-100 bg-slate-900">
           <form id="new-quote-form" onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {/* Vessel Name */}
-              <div>
+            <div className="grid grid-cols-1 sm:grid-cols-12 gap-3.5 items-start">
+              {/* Vessel Name (5 cols) */}
+              <div className="sm:col-span-5">
                 <label className="block text-slate-100 font-bold mb-1">
                   船名 (Vessel Name) <span className="text-slate-400 font-normal text-[11px] ml-1">(任意)</span>
                 </label>
@@ -188,26 +192,47 @@ export const NewQuoteModal: React.FC<NewQuoteModalProps> = ({
                 </div>
               </div>
 
-              {/* Destination Airport Codes */}
-              <div>
+              {/* Destination Airport Codes (4 cols) */}
+              <div className="sm:col-span-4">
                 <label className="block text-slate-100 font-bold mb-1">
-                  向け地空港コード (IATA 3レター) <span className="text-rose-500">*</span>
+                  向け地空港コード <span className="text-rose-500">*</span>
                 </label>
                 <div className="relative">
                   <Plane className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                   <input
                     type="text"
-                    placeholder="例: SIN, BKK (カンマ区切り)"
+                    placeholder="例: SIN, BKK"
                     value={airportCodesInput}
                     onChange={(e) => setAirportCodesInput(e.target.value)}
                     className="w-full pl-9 pr-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-xs font-mono font-semibold uppercase text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500"
                   />
                 </div>
                 {invalidAirports.length > 0 && (
-                  <p className="mt-1 text-[11px] text-amber-400 font-medium">
-                    ⚠️ 空港コードは英大文字3桁（例: SIN, BKK, HND, NRT）で入力してください。
+                  <p className="mt-1 text-[10px] text-amber-400 font-medium">
+                    ⚠️ 英大文字3桁で入力してください。
                   </p>
                 )}
+              </div>
+
+              {/* Weight Break (重量帯) - Placed directly to the right of destination (3 cols) */}
+              <div className="sm:col-span-3">
+                <label className="block text-slate-100 font-bold mb-1">
+                  重量帯 <span className="text-slate-400 font-normal text-[11px] ml-1">(任意)</span>
+                </label>
+                <div className="relative">
+                  <Scale className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                  <select
+                    value={weightBreak}
+                    onChange={(e) => setWeightBreak(e.target.value as WeightBreak | "")}
+                    className="w-full pl-9 pr-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-xs font-semibold text-white focus:outline-none focus:ring-2 focus:ring-sky-500 cursor-pointer"
+                  >
+                    {WEIGHT_BREAK_OPTIONS.map((opt) => (
+                      <option key={opt.value} value={opt.value} className="bg-slate-800 text-white">
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
             </div>
 

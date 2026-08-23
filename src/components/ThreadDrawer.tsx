@@ -1,8 +1,10 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import {
   X,
   Ship,
   Plane,
+  Scale,
+  Search,
   Clock,
   AlertTriangle,
   Link2,
@@ -33,6 +35,7 @@ import {
   AtSign,
   CheckCircle,
   RotateCcw,
+  Sparkles,
 } from "lucide-react";
 import {
   ExternalLink,
@@ -41,6 +44,8 @@ import {
   QuoteStatus,
   StaffMember,
   UserProfile,
+  WeightBreak,
+  WEIGHT_BREAK_OPTIONS,
   formatCustomsDate,
 } from "../types";
 import { convertTsvToHtmlTable, copyToClipboard } from "../lib/excelParser";
@@ -55,6 +60,7 @@ import { checkExcelFilesForWarnings, ExcelWarningDetail } from "../lib/excelChec
 
 interface ThreadDrawerProps {
   quote: QuotationItem | null;
+  allQuotes?: QuotationItem[];
   messages: QuoteMessage[];
   currentUser: UserProfile;
   staffMembers?: StaffMember[];
@@ -74,6 +80,7 @@ interface ThreadDrawerProps {
     links?: ExternalLink[]
   ) => void;
   onDeleteMessage?: (messageId: string) => void;
+  onSelectQuote?: (quote: QuotationItem) => void;
 }
 
 interface AttachedFileItem {
@@ -87,6 +94,7 @@ interface AttachedFileItem {
 
 export const ThreadDrawer: React.FC<ThreadDrawerProps> = ({
   quote,
+  allQuotes = [],
   messages,
   currentUser,
   staffMembers = [],
@@ -98,6 +106,7 @@ export const ThreadDrawer: React.FC<ThreadDrawerProps> = ({
   onUpdateQuote,
   onUpdateMessage,
   onDeleteMessage,
+  onSelectQuote,
 }) => {
   const [replyText, setReplyText] = useState("");
   const [replyLinks, setReplyLinks] = useState<ExternalLink[]>([]);
@@ -106,6 +115,10 @@ export const ThreadDrawer: React.FC<ThreadDrawerProps> = ({
   const [linkUrlInput, setLinkUrlInput] = useState("");
   const [copiedMsgId, setCopiedMsgId] = useState<string | null>(null);
   const [isDraggingFile, setIsDraggingFile] = useState(false);
+
+  // Similar Past Quotes Panel Toggle
+  const [showSimilarQuotes, setShowSimilarQuotes] = useState(false);
+  const [copiedFareQuoteId, setCopiedFareQuoteId] = useState<string | null>(null);
 
   // Excel File Content Warning Modal State
   const [showExcelWarningModal, setShowExcelWarningModal] = useState(false);
@@ -125,6 +138,7 @@ export const ThreadDrawer: React.FC<ThreadDrawerProps> = ({
   const [editVessel, setEditVessel] = useState("");
   const [editWeight, setEditWeight] = useState("");
   const [editAirports, setEditAirports] = useState("");
+  const [editWeightBreak, setEditWeightBreak] = useState<WeightBreak | "">("");
   const [editUrgent, setEditUrgent] = useState(false);
   const [editAssignedStaffId, setEditAssignedStaffId] = useState<string>("");
 
@@ -160,10 +174,39 @@ export const ThreadDrawer: React.FC<ThreadDrawerProps> = ({
       setEditVessel(quote.vesselName);
       setEditWeight(quote.customsClearanceDate || quote.grossWeight || "");
       setEditAirports(quote.airportCodes.join(", "));
+      setEditWeightBreak((quote.weightBreak as WeightBreak) || "");
       setEditUrgent(quote.isUrgent);
       setEditAssignedStaffId(quote.assignedStaffId || "");
     }
   }, [quote, currentUser.email]);
+
+  // Compute similar past quotes (strictly matching BOTH destination airport AND weight break)
+  const similarQuotes = useMemo(() => {
+    if (!quote || !allQuotes) return [];
+    const hasCurrentAirports = quote.airportCodes && quote.airportCodes.length > 0;
+    const hasCurrentWeightBreak = Boolean(quote.weightBreak);
+
+    // Both destination airport and weight break must be present
+    if (!hasCurrentAirports || !hasCurrentWeightBreak) {
+      return [];
+    }
+
+    return allQuotes
+      .filter((q) => q.id !== quote.id)
+      .filter((q) => {
+        const matchAirport = quote.airportCodes.some((code) =>
+          q.airportCodes?.some((c) => c.toUpperCase() === code.toUpperCase())
+        );
+        const matchWeight =
+          Boolean(q.weightBreak) && q.weightBreak === quote.weightBreak;
+        return matchAirport && matchWeight;
+      })
+      .sort(
+        (a, b) =>
+          new Date(b.createdAt || b.updatedAt).getTime() -
+          new Date(a.createdAt || a.updatedAt).getTime()
+      );
+  }, [quote, allQuotes]);
 
   if (!quote) return null;
 
@@ -184,6 +227,7 @@ export const ThreadDrawer: React.FC<ThreadDrawerProps> = ({
       customsClearanceDate: editWeight.trim() || undefined,
       grossWeight: editWeight.trim() || quote.grossWeight,
       airportCodes: airports.length > 0 ? airports : quote.airportCodes,
+      weightBreak: editWeightBreak || undefined,
       isUrgent: editUrgent,
       assignedStaffId: editAssignedStaffId || undefined,
       updatedAt: new Date().toISOString(),
@@ -590,6 +634,17 @@ export const ThreadDrawer: React.FC<ThreadDrawerProps> = ({
               </span>
             ))}
 
+            {/* Weight Break (重量帯) */}
+            {quote.weightBreak && (
+              <span
+                className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-mono font-black bg-indigo-950 text-indigo-300 border border-indigo-500 shrink-0 shadow-2xs"
+                title={`重量帯: ${quote.weightBreak}`}
+              >
+                <Scale className="w-3.5 h-3.5 text-indigo-400" />
+                {quote.weightBreak}
+              </span>
+            )}
+
             {/* Title */}
             <h2 className="font-extrabold text-sm sm:text-base text-sky-300 truncate shrink-0 max-w-[200px] sm:max-w-[320px]">
               {quote.title}
@@ -691,6 +746,24 @@ export const ThreadDrawer: React.FC<ThreadDrawerProps> = ({
               </>
             )}
 
+            {/* Similar Past Quotes Button */}
+            <button
+              type="button"
+              onClick={() => setShowSimilarQuotes((prev) => !prev)}
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all border cursor-pointer ${
+                showSimilarQuotes
+                  ? "bg-cyan-600 text-white border-cyan-400 font-extrabold shadow-md ring-2 ring-cyan-400/40"
+                  : "bg-slate-900 hover:bg-cyan-950 text-cyan-300 border-cyan-500/40"
+              }`}
+              title="同一向地・重量帯の過去見積をワンクリックで検索・引用"
+            >
+              <Search className="w-3.5 h-3.5 text-cyan-400" />
+              <span className="hidden sm:inline">類似過去見積</span>
+              <span className="px-1.5 py-0.2 bg-cyan-950 text-cyan-300 rounded-full text-[10px] font-mono border border-cyan-500/50">
+                {similarQuotes.length}
+              </span>
+            </button>
+
             <button
               type="button"
               onClick={() => {
@@ -776,7 +849,7 @@ export const ThreadDrawer: React.FC<ThreadDrawerProps> = ({
               </button>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 text-xs">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 text-xs">
               <div>
                 <label className="block text-[11px] font-bold text-amber-300 mb-1">
                   案件タイトル:
@@ -824,6 +897,23 @@ export const ThreadDrawer: React.FC<ThreadDrawerProps> = ({
                   className="w-full px-2.5 py-1.5 bg-slate-900 border border-amber-500/60 rounded text-amber-100 font-mono font-bold focus:outline-none focus:ring-1 focus:ring-amber-400"
                   placeholder="SIN, DXB, BKK"
                 />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-amber-300 mb-1">
+                  重量帯 (Weight Break):
+                </label>
+                <select
+                  value={editWeightBreak}
+                  onChange={(e) => setEditWeightBreak(e.target.value as WeightBreak | "")}
+                  className="w-full px-2.5 py-1.5 bg-slate-900 border border-amber-500/60 rounded text-amber-100 font-bold focus:outline-none focus:ring-1 focus:ring-amber-400 cursor-pointer"
+                >
+                  {WEIGHT_BREAK_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div>
@@ -903,6 +993,195 @@ export const ThreadDrawer: React.FC<ThreadDrawerProps> = ({
                 </button>
               </div>
             ))}
+          </div>
+        )}
+
+        {/* Similar Past Quotes Collapsible Panel */}
+        {showSimilarQuotes && (
+          <div className="bg-slate-950 border-b border-cyan-700/60 p-4 max-h-[360px] overflow-y-auto animate-in slide-in-from-top-2 duration-150 shrink-0">
+            <div className="flex items-center justify-between pb-2 mb-3 border-b border-slate-800">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="flex items-center gap-1.5 text-xs font-extrabold text-cyan-300">
+                  <Sparkles className="w-4 h-4 text-cyan-400" />
+                  同一条件の過去見積 (向地: {quote.airportCodes.join(", ") || "未設定"} ＆ 重量帯: {quote.weightBreak || "未設定"})
+                </span>
+                <span className="text-[11px] px-2 py-0.5 rounded-full bg-cyan-950 text-cyan-400 border border-cyan-600/50 font-bold">
+                  {similarQuotes.length} 件合致
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowSimilarQuotes(false)}
+                className="text-xs text-slate-400 hover:text-white px-2 py-1 rounded bg-slate-900 hover:bg-slate-800 cursor-pointer"
+              >
+                ✕ パネルを閉じる
+              </button>
+            </div>
+
+            {similarQuotes.length === 0 ? (
+              <div className="text-center py-6 text-slate-400 text-xs bg-slate-900/60 rounded-xl border border-slate-800">
+                <Search className="w-8 h-8 mx-auto mb-2 text-slate-600" />
+                <p className="font-bold text-slate-300">一致する過去見積は見つかりませんでした</p>
+                <p className="text-[11px] text-slate-400 mt-1">
+                  {!quote.airportCodes?.length || !quote.weightBreak ? (
+                    <span>※現在の案件に「向け地」と「重量帯」の両方が設定されている必要があります（現在: 向け地={quote.airportCodes.join(", ") || "未設定"} / 重量帯={quote.weightBreak || "未設定"}）。</span>
+                  ) : (
+                    <span>向け地（{quote.airportCodes.join(", ")}）と重量帯（{quote.weightBreak}）の両方が一致する過去案件はありません。</span>
+                  )}
+                </p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {similarQuotes.map((sq) => {
+                  const sqMessages = messages.filter((m) => m.quoteId === sq.id);
+                  const sqLinks: { title: string; url: string; msgDate?: string }[] = [];
+                  (sq.externalLinks || []).forEach((l) => sqLinks.push(l));
+                  sqMessages.forEach((m) => {
+                    (m.externalLinks || []).forEach((l) =>
+                      sqLinks.push({ ...l, msgDate: m.createdAt })
+                    );
+                  });
+
+                  // Find latest fare or message text
+                  const latestMsg = sqMessages[sqMessages.length - 1];
+                  const plainText = latestMsg
+                    ? stripHtmlToPlainText(latestMsg.contentHtml)
+                    : "";
+
+                  return (
+                    <div
+                      key={sq.id}
+                      className="bg-slate-900 border border-slate-800 hover:border-cyan-500/60 rounded-xl p-3 flex flex-col justify-between gap-2.5 transition-all text-xs shadow-md"
+                    >
+                      <div className="space-y-1.5">
+                        <div className="flex items-center justify-between gap-1 flex-wrap">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            {sq.airportCodes.map((code) => (
+                              <span
+                                key={code}
+                                className="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-sky-950 text-sky-300 border border-sky-700"
+                              >
+                                {code}
+                              </span>
+                            ))}
+                            {sq.weightBreak && (
+                              <span className="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-indigo-950 text-indigo-300 border border-indigo-600">
+                                {sq.weightBreak}
+                              </span>
+                            )}
+                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 font-medium">
+                              {KANBAN_COLUMNS.find((c) => c.id === sq.status)?.title || sq.status}
+                            </span>
+                          </div>
+                          <span className="text-[10px] text-slate-400">
+                            {formatDate(sq.createdAt || sq.updatedAt)}
+                          </span>
+                        </div>
+
+                        <div className="font-bold text-slate-100 truncate text-sm">
+                          {sq.title}
+                        </div>
+                        <div className="text-[11px] text-amber-300 flex items-center gap-1">
+                          <Ship className="w-3 h-3 text-amber-400" />
+                          <span>{sq.vesselName}</span>
+                          <span className="text-slate-600">|</span>
+                          <span className="text-slate-400">作成: {sq.createdBy.split("@")[0]}</span>
+                        </div>
+
+                        {/* Message Preview Snippet */}
+                        {plainText && (
+                          <div className="bg-slate-950/80 p-2 rounded border border-slate-800 text-[11px] text-slate-300 line-clamp-2 font-mono">
+                            {plainText}
+                          </div>
+                        )}
+
+                        {/* Attached Files */}
+                        {sqLinks.length > 0 && (
+                          <div className="space-y-1 pt-1">
+                            <span className="text-[10px] text-slate-400 font-bold block">
+                              添付ファイル ({sqLinks.length}件):
+                            </span>
+                            <div className="flex flex-wrap gap-1.5">
+                              {sqLinks.map((file, fIdx) => (
+                                <div
+                                  key={fIdx}
+                                  className="inline-flex items-center gap-1 px-2 py-0.5 bg-slate-950 border border-slate-700 rounded text-[10px] text-cyan-300"
+                                >
+                                  <FileSpreadsheet className="w-3 h-3 text-cyan-400" />
+                                  <span className="max-w-[120px] truncate">{file.title}</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleOpenPreview(file.title, file.url)}
+                                    className="p-0.5 hover:text-white"
+                                    title="プレビュー"
+                                  >
+                                    <Eye className="w-3 h-3" />
+                                  </button>
+                                  <a
+                                    href={file.url}
+                                    download={file.title}
+                                    className="p-0.5 hover:text-white"
+                                    title="ダウンロード"
+                                  >
+                                    <Download className="w-3 h-3" />
+                                  </a>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Action buttons */}
+                      <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-800">
+                        {plainText && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const fareSnippet = `【過去見積参照 (${sq.airportCodes.join("/")} ${sq.weightBreak || ""})】\n${plainText}`;
+                              setReplyText((prev) =>
+                                prev ? `${prev}\n\n${fareSnippet}` : fareSnippet
+                              );
+                              setCopiedFareQuoteId(sq.id);
+                              setTimeout(() => setCopiedFareQuoteId(null), 2500);
+                            }}
+                            className="px-2.5 py-1 bg-cyan-950 hover:bg-cyan-900 text-cyan-300 border border-cyan-600/60 rounded text-[11px] font-bold flex items-center gap-1 cursor-pointer transition-colors"
+                            title="この過去見積の本文内容を返信欄に入力"
+                          >
+                            {copiedFareQuoteId === sq.id ? (
+                              <>
+                                <Check className="w-3 h-3 text-emerald-400" />
+                                <span className="text-emerald-300">返信欄に引用完了</span>
+                              </>
+                            ) : (
+                              <>
+                                <Copy className="w-3 h-3" />
+                                <span>本文を返信欄に引用</span>
+                              </>
+                            )}
+                          </button>
+                        )}
+
+                        {onSelectQuote && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              onSelectQuote(sq);
+                              setShowSimilarQuotes(false);
+                            }}
+                            className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded text-[11px] font-bold flex items-center gap-1 cursor-pointer"
+                            title="この案件の詳細を開く"
+                          >
+                            <span>案件を開く</span>
+                            <ChevronRight className="w-3 h-3" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
 

@@ -11,9 +11,12 @@ import {
   AlertTriangle,
   UserCheck,
   FileText,
+  AlertOctagon,
+  CheckCircle2,
 } from "lucide-react";
 import { QuotationItem, QuoteMessage, StaffMember, QuoteStatus, formatCustomsDate } from "../types";
 import { KANBAN_COLUMNS } from "./KanbanBoard";
+import { toastNotifier } from "../lib/toastNotifier";
 
 interface ArchiveModalProps {
   isOpen: boolean;
@@ -39,6 +42,8 @@ export const ArchiveModal: React.FC<ArchiveModalProps> = ({
   onSelectQuote,
 }) => {
   const [searchQuery, setSearchQuery] = useState("");
+  const [deletingQuote, setDeletingQuote] = useState<QuotationItem | null>(null);
+  const [isConfirmingDeleteAll, setIsConfirmingDeleteAll] = useState(false);
 
   if (!isOpen) return null;
 
@@ -53,25 +58,40 @@ export const ArchiveModal: React.FC<ArchiveModalProps> = ({
     );
   });
 
-  const handleDeleteAll = () => {
-    if (archivedQuotes.length === 0) return;
-    if (
-      window.confirm(
-        `アーカイブ済みの見積情報 ${archivedQuotes.length} 件を全て完全削除しますか？\n※関連するチャット履歴も全て削除され、元に戻すことはできません。`
-      )
-    ) {
-      onDeleteAllArchived();
-    }
+  const handleExecuteDeleteQuote = () => {
+    if (!deletingQuote) return;
+    const quoteTitle = deletingQuote.title;
+    const quoteId = deletingQuote.id;
+    setDeletingQuote(null);
+    onDeleteQuote(quoteId);
+    toastNotifier.show({
+      type: "info",
+      title: "🗑️ 見積案件を削除しました",
+      message: `「${quoteTitle}」をアーカイブから完全に削除しました。`,
+      duration: 4000,
+    });
   };
 
-  const handleDeleteItem = (quote: QuotationItem) => {
-    if (
-      window.confirm(
-        `「${quote.title}」を削除しますか？\n※この操作は取り消せません。`
-      )
-    ) {
-      onDeleteQuote(quote.id);
-    }
+  const handleExecuteDeleteAll = () => {
+    const count = archivedQuotes.length;
+    setIsConfirmingDeleteAll(false);
+    onDeleteAllArchived();
+    toastNotifier.show({
+      type: "info",
+      title: "🗑️ アーカイブ一括削除完了",
+      message: `アーカイブ済み見積 ${count} 件をすべて完全に削除しました。`,
+      duration: 4000,
+    });
+  };
+
+  const handleExecuteRestoreQuote = (quote: QuotationItem) => {
+    onRestoreQuote(quote.id);
+    toastNotifier.show({
+      type: "success",
+      title: "✨ 見積案件を復元しました",
+      message: `「${quote.title}」をカンバンボードに復元しました。`,
+      duration: 4000,
+    });
   };
 
   const getStatusBadge = (status: QuoteStatus) => {
@@ -81,7 +101,7 @@ export const ArchiveModal: React.FC<ArchiveModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-fade-in">
-      <div className="bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-800 rounded-2xl w-full max-w-4xl max-h-[85vh] flex flex-col shadow-2xl overflow-hidden">
+      <div className="bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-800 rounded-2xl w-full max-w-4xl max-h-[85vh] flex flex-col shadow-2xl overflow-hidden relative">
         {/* Modal Header */}
         <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-slate-50 dark:bg-slate-900/80">
           <div className="flex items-center gap-2.5">
@@ -133,7 +153,7 @@ export const ArchiveModal: React.FC<ArchiveModalProps> = ({
 
           {/* Delete All Button */}
           <button
-            onClick={handleDeleteAll}
+            onClick={() => setIsConfirmingDeleteAll(true)}
             disabled={archivedQuotes.length === 0}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${
               archivedQuotes.length === 0
@@ -238,8 +258,8 @@ export const ArchiveModal: React.FC<ArchiveModalProps> = ({
                   <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
                     {/* Restore Button */}
                     <button
-                      onClick={() => onRestoreQuote(quote.id)}
-                      className="flex items-center gap-1 px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/60 dark:hover:bg-emerald-900/80 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800 rounded-lg text-xs font-bold transition-all active:scale-95"
+                      onClick={() => handleExecuteRestoreQuote(quote)}
+                      className="flex items-center gap-1 px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/60 dark:hover:bg-emerald-900/80 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800 rounded-lg text-xs font-bold transition-all active:scale-95 cursor-pointer"
                       title="この見積情報をカンバンボードに復元します"
                     >
                       <RotateCcw className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
@@ -248,8 +268,8 @@ export const ArchiveModal: React.FC<ArchiveModalProps> = ({
 
                     {/* Delete Item Button */}
                     <button
-                      onClick={() => handleDeleteItem(quote)}
-                      className="flex items-center gap-1 px-2.5 py-1.5 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/60 dark:hover:bg-rose-900/80 text-rose-700 dark:text-rose-300 border border-rose-300 dark:border-rose-800 rounded-lg text-xs font-bold transition-all active:scale-95"
+                      onClick={() => setDeletingQuote(quote)}
+                      className="flex items-center gap-1 px-2.5 py-1.5 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/60 dark:hover:bg-rose-900/80 text-rose-700 dark:text-rose-300 border border-rose-300 dark:border-rose-800 rounded-lg text-xs font-bold transition-all active:scale-95 cursor-pointer"
                       title="この見積情報を個別削除します"
                     >
                       <Trash2 className="w-3.5 h-3.5 text-rose-600 dark:text-rose-400" />
@@ -269,12 +289,121 @@ export const ArchiveModal: React.FC<ArchiveModalProps> = ({
           </div>
           <button
             onClick={onClose}
-            className="px-4 py-1.5 bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 rounded-lg text-xs font-bold transition-colors"
+            className="px-4 py-1.5 bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 rounded-lg text-xs font-bold transition-colors cursor-pointer"
           >
             閉じる
           </button>
         </div>
+
+        {/* In-app Single Item Deletion Confirmation Modal */}
+        {deletingQuote && (
+          <div className="fixed inset-0 z-70 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-xs animate-in fade-in duration-150">
+            <div className="bg-white dark:bg-slate-900 border border-rose-300 dark:border-rose-900/60 rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-4">
+              <div className="flex items-center gap-3 text-rose-600 dark:text-rose-400">
+                <div className="w-10 h-10 rounded-full bg-rose-100 dark:bg-rose-950/80 flex items-center justify-center shrink-0 border border-rose-300 dark:border-rose-800">
+                  <Trash2 className="w-5 h-5 text-rose-600 dark:text-rose-400" />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-base text-slate-900 dark:text-slate-100">
+                    見積案件の完全削除
+                  </h3>
+                  <p className="text-xs text-rose-600 dark:text-rose-400 font-medium">
+                    この操作を実行すると元に戻すことはできません
+                  </p>
+                </div>
+              </div>
+
+              <div className="p-3.5 bg-slate-50 dark:bg-slate-950/80 rounded-xl border border-slate-200 dark:border-slate-800 text-xs space-y-1.5">
+                <div className="font-bold text-sm text-slate-900 dark:text-slate-100">
+                  {deletingQuote.title}
+                </div>
+                <div className="flex items-center gap-2 text-slate-500 text-xs">
+                  <Ship className="w-3.5 h-3.5 text-slate-400" />
+                  <span>本船名: {deletingQuote.vesselName}</span>
+                </div>
+                <div className="text-[11px] text-slate-400 font-mono">
+                  ID: {deletingQuote.id}
+                </div>
+              </div>
+
+              <p className="text-xs text-slate-600 dark:text-slate-300 font-medium leading-relaxed">
+                この見積案件および紐づくすべてのメッセージ・履歴データを完全に削除しますか？
+              </p>
+
+              <div className="flex items-center justify-end gap-2.5 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setDeletingQuote(null)}
+                  className="px-4 py-2 bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold rounded-lg text-xs transition-colors cursor-pointer"
+                >
+                  キャンセル
+                </button>
+                <button
+                  type="button"
+                  onClick={handleExecuteDeleteQuote}
+                  className="flex items-center gap-1.5 px-4 py-2 bg-rose-600 hover:bg-rose-500 active:bg-rose-700 text-white font-extrabold rounded-lg text-xs shadow-md transition-all cursor-pointer"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  <span>完全に削除する</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* In-app All Items Deletion Confirmation Modal */}
+        {isConfirmingDeleteAll && (
+          <div className="fixed inset-0 z-70 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-xs animate-in fade-in duration-150">
+            <div className="bg-white dark:bg-slate-900 border border-rose-300 dark:border-rose-900/60 rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-4">
+              <div className="flex items-center gap-3 text-rose-600 dark:text-rose-400">
+                <div className="w-10 h-10 rounded-full bg-rose-100 dark:bg-rose-950/80 flex items-center justify-center shrink-0 border border-rose-300 dark:border-rose-800">
+                  <AlertOctagon className="w-5 h-5 text-rose-600 dark:text-rose-400" />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-base text-slate-900 dark:text-slate-100">
+                    アーカイブの一括全件削除
+                  </h3>
+                  <p className="text-xs text-rose-600 dark:text-rose-400 font-medium">
+                    警告: この操作は取り消せません
+                  </p>
+                </div>
+              </div>
+
+              <div className="p-3.5 bg-rose-50/50 dark:bg-rose-950/30 rounded-xl border border-rose-200 dark:border-rose-900/50 text-xs space-y-1">
+                <div className="font-bold text-rose-800 dark:text-rose-200">
+                  削除対象: アーカイブ済み {archivedQuotes.length} 件の見積データ
+                </div>
+                <div className="text-rose-600 dark:text-rose-400 text-[11px]">
+                  ※関連するすべてのメッセージスレッドおよびチャット履歴も完全に消去されます。
+                </div>
+              </div>
+
+              <p className="text-xs text-slate-600 dark:text-slate-300 font-medium leading-relaxed">
+                本当にアーカイブ内のすべての見積案件を一括削除しますか？
+              </p>
+
+              <div className="flex items-center justify-end gap-2.5 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsConfirmingDeleteAll(false)}
+                  className="px-4 py-2 bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold rounded-lg text-xs transition-colors cursor-pointer"
+                >
+                  キャンセル
+                </button>
+                <button
+                  type="button"
+                  onClick={handleExecuteDeleteAll}
+                  className="flex items-center gap-1.5 px-4 py-2 bg-rose-600 hover:bg-rose-500 active:bg-rose-700 text-white font-extrabold rounded-lg text-xs shadow-md transition-all cursor-pointer"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  <span>全 {archivedQuotes.length} 件を一括削除する</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
 };
+

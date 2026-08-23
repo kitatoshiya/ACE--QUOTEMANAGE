@@ -21,7 +21,6 @@ import {
   CheckCircle2,
   Columns as KanbanIcon,
   StickyNote as StickyIcon,
-  Mail as MailIcon,
   Image as ImageIcon,
   Bell,
   Play,
@@ -171,7 +170,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             </div>
           </div>
 
-          {/* View Mode Switcher (表：カンバン画面 / 裏：裏画面 付箋ボード / メール：共通メール Gmail) */}
+          {/* View Mode Switcher (表：カンバン画面 / 裏：裏画面 付箋ボード / 履歴：見積履歴検索) */}
           <div className="flex items-center bg-slate-900/90 p-1 rounded-xl border border-slate-700/80 shadow-inner shrink-0">
             <button
               onClick={() => onActiveViewChange("kanban")}
@@ -198,16 +197,16 @@ export const Navbar: React.FC<NavbarProps> = ({
               <span className="sm:hidden">裏</span>
             </button>
             <button
-              onClick={() => onActiveViewChange("email_client")}
+              onClick={() => onActiveViewChange("history_search")}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-black transition-all ${
-                activeView === "email_client"
-                  ? "bg-gradient-to-r from-rose-500 via-rose-600 to-amber-500 text-white shadow-md scale-100"
-                  : "text-slate-400 hover:text-rose-400 hover:bg-slate-800/60"
+                activeView === "history_search"
+                  ? "bg-gradient-to-r from-cyan-600 via-teal-600 to-sky-600 text-white shadow-md scale-100"
+                  : "text-slate-400 hover:text-cyan-400 hover:bg-slate-800/60"
               }`}
             >
-              <MailIcon className="w-3.5 h-3.5 text-rose-400" />
-              <span className="hidden sm:inline font-bold">共通メール</span>
-              <span className="sm:hidden">メール</span>
+              <Search className="w-3.5 h-3.5 text-cyan-400" />
+              <span className="hidden sm:inline font-bold">見積履歴検索</span>
+              <span className="sm:hidden">履歴</span>
             </button>
           </div>
 

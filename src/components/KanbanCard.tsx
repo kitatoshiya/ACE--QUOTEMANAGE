@@ -2,6 +2,7 @@ import React, { useState, useMemo } from "react";
 import {
   Ship,
   Plane,
+  Scale,
   Clock,
   AlertTriangle,
   AlertOctagon,
@@ -223,6 +224,17 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({
               {code}
             </span>
           ))}
+
+          {/* Weight Break (重量帯) Badge */}
+          {quote.weightBreak && (
+            <span
+              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-indigo-950/90 text-indigo-300 border border-indigo-700/80 shadow-2xs"
+              title={`重量帯: ${quote.weightBreak}`}
+            >
+              <Scale className="w-2.5 h-2.5 text-indigo-400" />
+              {quote.weightBreak}
+            </span>
+          )}
 
           {/* Assigned Staff Member Badge */}
           {assignedStaff && (

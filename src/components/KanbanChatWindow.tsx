@@ -234,7 +234,7 @@ export function KanbanChatWindow({
         const timeStr = formatNotificationTimestamp(msg.createdAt);
         triggerDesktopNotification(
           `🔔 [チャット] ${msg.authorName || msg.authorEmail}さんからのメンション`,
-          `${msg.content.replace(/<[^>]*>/g, "").slice(0, 100)}\n【発信時刻: ${timeStr}】`,
+          `${(msg.content || "").replace(/<[^>]*>/g, "").slice(0, 100)}\n【発信時刻: ${timeStr}】`,
           tag
         );
       }

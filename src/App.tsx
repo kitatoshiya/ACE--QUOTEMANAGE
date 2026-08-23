@@ -5,8 +5,6 @@ import {
   AppTheme,
   ChatMessage,
   ChatTypingStatus,
-  EmailMessage,
-  EmailServerSettings,
   ExternalLink,
   FilterOptions,
   NotificationPreferences,
@@ -18,7 +16,6 @@ import {
   StaffMember,
   UserProfile,
 } from "./types";
-import { INITIAL_EMAILS, DEFAULT_EMAIL_SETTINGS } from "./lib/initialEmails";
 import {
   INITIAL_SAMPLE_QUOTES,
   INITIAL_SAMPLE_MESSAGES,
@@ -51,7 +48,6 @@ import {
 import { Navbar } from "./components/Navbar";
 import { KanbanBoard, KANBAN_COLUMNS } from "./components/KanbanBoard";
 import { StickyBoard } from "./components/StickyBoard";
-import { EmailClient } from "./components/EmailClient";
 import { isUserMentioned, processMentionNotificationsAndEmails, stripHtmlToPlainText } from "./lib/mentionUtils";
 import { formatNotificationTimestamp, isEventAlreadyNotified, markEventAsNotified, triggerDesktopNotification } from "./lib/notificationHelper";
 import { NewQuoteModal } from "./components/NewQuoteModal";
@@ -66,6 +62,7 @@ import { BackgroundSettingsModal } from "./components/BackgroundSettingsModal";
 import { NotificationSettingsModal } from "./components/NotificationSettingsModal";
 import { ToastContainer } from "./components/ToastContainer";
 import { SplashScreen } from "./components/SplashScreen";
+import { QuoteHistorySearch } from "./components/QuoteHistorySearch";
 import { AnimatePresence } from "motion/react";
 
 export default function App() {
@@ -317,92 +314,6 @@ export default function App() {
   useEffect(() => {
     saveLocalChatMessages(chatMessages);
   }, [chatMessages]);
-
-  // Emails state (Common Email Client)
-  const [emails, setEmails] = useState<EmailMessage[]>(() => {
-    const saved = localStorage.getItem("marine_emails_v1");
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch (e) {
-        console.error(e);
-      }
-    }
-    return INITIAL_EMAILS;
-  });
-
-  useEffect(() => {
-    localStorage.setItem("marine_emails_v1", JSON.stringify(emails));
-  }, [emails]);
-
-  // Email Server Settings State (Shared across all users)
-  const [emailServerSettings, setEmailServerSettings] = useState<EmailServerSettings>(() => {
-    const saved = localStorage.getItem("marine_email_settings_v1");
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch (e) {
-        console.error(e);
-      }
-    }
-    return DEFAULT_EMAIL_SETTINGS;
-  });
-
-  useEffect(() => {
-    localStorage.setItem("marine_email_settings_v1", JSON.stringify(emailServerSettings));
-  }, [emailServerSettings]);
-
-  // Firestore Sync for Global Email Settings
-  useEffect(() => {
-    if (!db) return;
-    const docRef = doc(db, "settings", "email_server");
-    const unsubscribe = onSnapshot(
-      docRef,
-      (snapshot) => {
-        if (!snapshot.exists()) {
-          setDoc(docRef, cleanForFirestore(DEFAULT_EMAIL_SETTINGS)).catch((err) =>
-            handleFirestoreError(err, OperationType.WRITE, "settings/email_server")
-          );
-          setEmailServerSettings(DEFAULT_EMAIL_SETTINGS);
-        } else {
-          setEmailServerSettings(snapshot.data() as EmailServerSettings);
-        }
-      },
-      (error) => {
-        handleFirestoreError(error, OperationType.GET, "settings/email_server");
-      }
-    );
-    return () => unsubscribe();
-  }, []);
-
-  const handleUpdateEmailServerSettings = (newSettings: EmailServerSettings) => {
-    const updated = {
-      ...newSettings,
-      updatedAt: new Date().toISOString(),
-      updatedBy: currentUser.email,
-    };
-    setEmailServerSettings(updated);
-    if (db) {
-      setDoc(doc(db, "settings", "email_server"), cleanForFirestore(updated)).catch((err) =>
-        handleFirestoreError(err, OperationType.WRITE, "settings/email_server")
-      );
-    }
-  };
-
-  // Wrapper for updating emails and syncing to Firestore
-  const handleSetEmails: React.Dispatch<React.SetStateAction<EmailMessage[]>> = (valueOrFn) => {
-    setEmails((prev) => {
-      const next = typeof valueOrFn === "function" ? valueOrFn(prev) : valueOrFn;
-      if (db) {
-        next.forEach((em) => {
-          setDoc(doc(db, "emails", em.id), cleanForFirestore(em)).catch((err) =>
-            handleFirestoreError(err, OperationType.WRITE, `emails/${em.id}`)
-          );
-        });
-      }
-      return next;
-    });
-  };
 
   // Active UI modal states
   const [isNewQuoteOpen, setIsNewQuoteOpen] = useState(false);
@@ -997,9 +908,17 @@ export default function App() {
   };
 
   const handleDeleteQuote = (quoteId: string) => {
+    if (selectedQuoteId === quoteId) {
+      setSelectedQuoteId(null);
+    }
     const msgIdsToDelete = messages.filter((m) => m.quoteId === quoteId).map((m) => m.id);
-    setQuotes((prev) => prev.filter((q) => q.id !== quoteId));
-    setMessages((prev) => prev.filter((m) => m.quoteId !== quoteId));
+    const updatedQuotes = quotes.filter((q) => q.id !== quoteId);
+    const updatedMessages = messages.filter((m) => m.quoteId !== quoteId);
+    setQuotes(updatedQuotes);
+    setMessages(updatedMessages);
+    saveLocalQuotes(updatedQuotes);
+    saveLocalMessages(updatedMessages);
+
     if (db) {
       deleteDoc(doc(db, "quotations", quoteId)).catch((err) =>
         handleFirestoreError(err, OperationType.DELETE, `quotations/${quoteId}`)
@@ -1014,9 +933,17 @@ export default function App() {
 
   const handleDeleteAllArchived = () => {
     const archivedIds = quotes.filter((q) => q.isArchived).map((q) => q.id);
+    if (selectedQuoteId && archivedIds.includes(selectedQuoteId)) {
+      setSelectedQuoteId(null);
+    }
     const msgIdsToDelete = messages.filter((m) => archivedIds.includes(m.quoteId)).map((m) => m.id);
-    setQuotes((prev) => prev.filter((q) => !q.isArchived));
-    setMessages((prev) => prev.filter((m) => !archivedIds.includes(m.quoteId)));
+    const updatedQuotes = quotes.filter((q) => !q.isArchived);
+    const updatedMessages = messages.filter((m) => !archivedIds.includes(m.quoteId));
+    setQuotes(updatedQuotes);
+    setMessages(updatedMessages);
+    saveLocalQuotes(updatedQuotes);
+    saveLocalMessages(updatedMessages);
+
     if (db) {
       archivedIds.forEach((qId) => {
         deleteDoc(doc(db, "quotations", qId)).catch((err) =>
@@ -1031,73 +958,7 @@ export default function App() {
     }
   };
 
-  // Create Quote directly from an Email message
-  const handleCreateQuoteFromEmail = (email: EmailMessage) => {
-    const newQuoteId = `quote-${Date.now()}`;
-    const cleanTitle =
-      email.subject
-        .replace(/^(Re:|Fwd:|【緊急見積依頼】|【見積依頼】|【至急確認】)\s*/i, "")
-        .trim() || "新規メール見積案件";
 
-    const vessel = email.vesselName || "不明";
-    const airport = email.airportCode ? [email.airportCode] : ["SIN"];
-
-    // Weight extraction fallback
-    const weightMatch = email.bodyText.match(/(\d+\s*kg)/i);
-    const weightStr = weightMatch ? weightMatch[1] : "未指定";
-
-    const nowIso = new Date().toISOString();
-
-    const newQuote: QuotationItem = {
-      id: newQuoteId,
-      title: cleanTitle,
-      vesselName: vessel,
-      airportCodes: airport,
-      grossWeight: weightStr,
-      isUrgent: email.labels?.includes("緊急") || email.subject.includes("緊急"),
-      status: "requested",
-      createdBy: currentUser.email,
-      updatedBy: currentUser.email,
-      createdAt: nowIso,
-      updatedAt: nowIso,
-      lastRepliedAt: nowIso,
-      readBy: [currentUser.email],
-    };
-
-    const initialMessage: QuoteMessage = {
-      id: `msg-${Date.now()}`,
-      quoteId: newQuoteId,
-      authorEmail: email.fromEmail,
-      authorName: email.fromName,
-      createdAt: nowIso,
-      contentHtml: `<p><strong>【受信メールより自動案件化】</strong></p><p>差出人: ${email.fromName} (${email.fromEmail})</p><p>件名: ${email.subject}</p><hr/><p>${email.bodyText.replace(/\n/g, "<br>")}</p>`,
-    };
-
-    setQuotes((prev) => [newQuote, ...prev]);
-    setMessages((prev) => [...prev, initialMessage]);
-    setSelectedQuoteId(newQuoteId);
-
-    if (shouldNotifyForQuoteEvent(newQuote, "requested", [initialMessage])) {
-      const timeStr = formatNotificationTimestamp(nowIso);
-      triggerDesktopNotification(
-        `📥 [新規タスク追加] ${newQuote.vesselName} (${newQuote.title})`,
-        `【見積依頼】に新規タスクが追加されました (受信メールより自動作成)\n【発信時刻: ${timeStr}】`,
-        `create-${newQuoteId}`
-      );
-    }
-
-    if (db) {
-      setDoc(doc(db, "quotations", newQuote.id), cleanForFirestore(newQuote)).catch((err) =>
-        handleFirestoreError(err, OperationType.WRITE, `quotations/${newQuote.id}`)
-      );
-      setDoc(doc(db, "messages", initialMessage.id), cleanForFirestore(initialMessage)).catch((err) =>
-        handleFirestoreError(err, OperationType.WRITE, `messages/${initialMessage.id}`)
-      );
-    }
-
-    // Switch view to Kanban to present the newly created quote
-    setActiveView("kanban");
-  };
 
   // Create new Quote
   const handleCreateQuote = (
@@ -1579,16 +1440,13 @@ export default function App() {
         ) : activeView === "sticky_board" ? (
           <StickyBoard currentUser={currentUser} currentTheme={theme} />
         ) : (
-          <EmailClient
-            emails={emails}
-            setEmails={handleSetEmails}
+          <QuoteHistorySearch
+            quotes={quotes}
+            messages={messages}
             currentUser={currentUser}
             staffMembers={staffMembers}
-            quotes={quotes}
-            onCreateQuoteFromEmail={handleCreateQuoteFromEmail}
-            emailServerSettings={emailServerSettings}
-            onUpdateEmailServerSettings={handleUpdateEmailServerSettings}
             currentTheme={theme}
+            onSelectQuote={(q) => setSelectedQuoteId(q.id)}
           />
         )}
         </div>
@@ -1605,6 +1463,7 @@ export default function App() {
 
       <ThreadDrawer
         quote={selectedQuote}
+        allQuotes={quotes}
         messages={messages}
         currentUser={currentUser}
         staffMembers={staffMembers}
@@ -1616,6 +1475,7 @@ export default function App() {
         onUpdateQuote={handleUpdateQuote}
         onUpdateMessage={handleUpdateMessage}
         onDeleteMessage={handleDeleteMessage}
+        onSelectQuote={(q) => setSelectedQuoteId(q.id)}
       />
 
       <StaffMasterModal

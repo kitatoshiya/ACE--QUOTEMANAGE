@@ -6,28 +6,29 @@ export type QuoteStatus =
   | "closed_or_on_hold";
 
 export type AppTheme = "light" | "dark" | "cute" | "digital";
-export type ActiveView = "kanban" | "sticky_board" | "email_client";
+export type ActiveView = "kanban" | "sticky_board" | "history_search";
 
-export type EmailFolder = "inbox" | "sent" | "drafts" | "trash" | "spam";
+export type WeightBreak =
+  | "MIN"
+  | "-45kg"
+  | "+45kg"
+  | "+100kg"
+  | "+300kg"
+  | "+500kg"
+  | "+1000kg";
 
-export interface EmailMessage {
-  id: string;
-  fromName: string;
-  fromEmail: string;
-  toEmail: string;
-  ccEmail?: string;
-  subject: string;
-  bodyText: string;
-  bodyHtml?: string;
-  receivedAt: string; // ISO string
-  isRead: boolean;
-  isStarred: boolean;
-  folder: EmailFolder;
-  labels?: string[];
-  vesselName?: string;
-  airportCode?: string;
-  quoteId?: string;
-}
+export const WEIGHT_BREAK_OPTIONS: { value: string; label: string }[] = [
+  { value: "", label: "未選択" },
+  { value: "MIN", label: "MIN" },
+  { value: "-45kg", label: "-45kg" },
+  { value: "+45kg", label: "+45kg" },
+  { value: "+100kg", label: "+100kg" },
+  { value: "+300kg", label: "+300kg" },
+  { value: "+500kg", label: "+500kg" },
+  { value: "+1000kg", label: "+1000kg" },
+];
+
+
 
 export type StickyNoteColor = "yellow" | "blue" | "green" | "pink" | "purple" | "slate";
 
@@ -152,6 +153,7 @@ export interface QuotationItem {
   title: string;
   vesselName: string;
   airportCodes: string[]; // 3-letter IATA codes
+  weightBreak?: WeightBreak | string; // 重量帯 (MIN, -45kg, +45kg, +100kg, +300kg, +500kg, +1000kg)
   grossWeight?: string; // Legacy/fallback
   customsClearanceDate?: string; // 通関日 (YYYY-MM-DD or date string, 任意)
   isUrgent: boolean;
@@ -190,28 +192,7 @@ export interface UserProfile {
   employeeNumber?: string;
 }
 
-export interface EmailServerSettings {
-  commonEmail: string;
-  senderName: string;
-  incomingProtocol: "IMAP" | "POP3" | "Gmail API";
-  incomingHost: string;
-  incomingPort: number;
-  incomingEncryption: "SSL/TLS" | "STARTTLS" | "NONE";
-  outgoingHost: string;
-  outgoingPort: number;
-  outgoingEncryption: "SSL/TLS" | "STARTTLS" | "NONE";
-  authUsername: string;
-  authPassword?: string;
-  authMethod?: "PASSWORD" | "OAUTH2_GMAIL" | "OAUTH2_OUTLOOK" | "OAUTH2_CUSTOM";
-  oauthClientId?: string;
-  oauthClientSecret?: string;
-  oauthRefreshToken?: string;
-  oauthTenantId?: string;
-  syncIntervalMinutes: number;
-  signatureText?: string;
-  updatedAt?: string;
-  updatedBy?: string;
-}
+
 
 export interface ChatMessage {
   id: string;
