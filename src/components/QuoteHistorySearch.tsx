@@ -36,6 +36,7 @@ import {
 } from "../types";
 import { getAirportLabel, POPULAR_IATA_AIRPORTS } from "../lib/iataAirports";
 import { stripHtmlToPlainText } from "../lib/mentionUtils";
+import { getCleanFilename, triggerFileDownload } from "../lib/fileUtils";
 import { FilePreviewModal, PreviewFile } from "./FilePreviewModal";
 
 interface QuoteHistorySearchProps {
@@ -87,9 +88,10 @@ export const QuoteHistorySearch: React.FC<QuoteHistorySearchProps> = ({
       if (q.externalLinks && q.externalLinks.length > 0) {
         const list = map.get(q.id) || [];
         q.externalLinks.forEach((fl) => {
+          const clean = getCleanFilename(fl.title, fl.url);
           list.push({
             id: fl.id || `${q.id}-${fl.title}`,
-            name: fl.title || "添付ファイル",
+            name: clean,
             url: fl.url,
             quoteId: q.id,
             vesselName: q.vesselName || "",
@@ -113,9 +115,10 @@ export const QuoteHistorySearch: React.FC<QuoteHistorySearchProps> = ({
         if (fileLinks.length > 0) {
           const list = map.get(msg.quoteId) || [];
           fileLinks.forEach((fl) => {
+            const clean = getCleanFilename(fl.title, fl.url);
             list.push({
               id: fl.id || `${msg.id}-${fl.title}`,
-              name: fl.title || "見積書ファイル",
+              name: clean,
               url: fl.url,
               quoteId: msg.quoteId,
               vesselName: "",
@@ -208,17 +211,7 @@ export const QuoteHistorySearch: React.FC<QuoteHistorySearchProps> = ({
   // Direct download file handler
   const handleDownloadFile = (file: ExtractedFile, e: React.MouseEvent) => {
     e.stopPropagation();
-    try {
-      const a = document.createElement("a");
-      a.href = file.url;
-      a.download = file.name;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-    } catch (err) {
-      console.error("Failed to download file:", err);
-      window.open(file.url, "_blank");
-    }
+    triggerFileDownload(file.name, file.url);
   };
 
   // Preview file handler
@@ -521,7 +514,13 @@ export const QuoteHistorySearch: React.FC<QuoteHistorySearchProps> = ({
             {filteredQuotes.map((quote) => {
               const files = quoteFilesMap.get(quote.id) || [];
               const relatedMsgs = messages.filter((m) => m.quoteId === quote.id);
-              const latestMsg = relatedMsgs[relatedMsgs.length - 1];
+              const userMsgs = relatedMsgs.filter(
+                (m) =>
+                  !m.isSystemLog &&
+                  !m.contentHtml?.includes("ステータスを") &&
+                  !m.contentHtml?.includes("がステータスを")
+              );
+              const latestMsg = userMsgs[userMsgs.length - 1];
               const assignedStaff = staffMembers.find((s) => s.id === quote.assignedStaffId);
 
               return (
@@ -612,7 +611,7 @@ export const QuoteHistorySearch: React.FC<QuoteHistorySearchProps> = ({
                               ※クリックで即座にダウンロードして新しい見積書に活用できます
                             </span>
                           </div>
-                          <div className="flex items-center gap-2 flex-wrap">
+                          <div className="flex flex-col gap-1.5 w-full">
                             {files.map((file) => {
                               const isExcel = file.name.match(/\.(xlsx|xls|csv)$/i);
                               const isPdf = file.name.match(/\.pdf$/i);
@@ -620,36 +619,42 @@ export const QuoteHistorySearch: React.FC<QuoteHistorySearchProps> = ({
                               return (
                                 <div
                                   key={file.id}
-                                  className="inline-flex items-center gap-2 px-2.5 py-1 rounded-lg bg-slate-950 border border-slate-700 hover:border-emerald-500 text-xs text-slate-200 transition-all shadow-xs"
+                                  className="flex items-center justify-between gap-2 px-3 py-1.5 rounded-lg bg-slate-950 border border-slate-700 hover:border-emerald-500 text-xs text-slate-200 transition-all shadow-xs w-full"
                                 >
-                                  {isExcel ? (
-                                    <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                                  ) : isPdf ? (
-                                    <FileText className="w-3.5 h-3.5 text-rose-400 shrink-0" />
-                                  ) : (
-                                    <FileIcon className="w-3.5 h-3.5 text-sky-400 shrink-0" />
-                                  )}
-                                  <span className="font-medium truncate max-w-[180px]" title={file.name}>
-                                    {file.name}
-                                  </span>
+                                  <div className="flex items-center gap-2 min-w-0 flex-1">
+                                    {isExcel ? (
+                                      <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                                    ) : isPdf ? (
+                                      <FileText className="w-3.5 h-3.5 text-rose-400 shrink-0" />
+                                    ) : (
+                                      <FileIcon className="w-3.5 h-3.5 text-sky-400 shrink-0" />
+                                    )}
+                                    <span className="font-medium truncate flex-1 min-w-0" title={file.name}>
+                                      {file.name}
+                                    </span>
+                                  </div>
 
-                                  {/* Download button */}
-                                  <button
-                                    onClick={(e) => handleDownloadFile(file, e)}
-                                    className="p-1 text-slate-400 hover:text-emerald-300 rounded hover:bg-emerald-950/60 transition-colors"
-                                    title="この見積ファイルをダウンロード"
-                                  >
-                                    <Download className="w-3.5 h-3.5" />
-                                  </button>
+                                  <div className="flex items-center gap-1.5 shrink-0">
+                                    {/* Preview button */}
+                                    <button
+                                      onClick={(e) => handlePreviewFile(file, e)}
+                                      className="px-2 py-1 text-slate-300 hover:text-sky-300 rounded hover:bg-sky-950/60 transition-colors flex items-center gap-1 text-[11px]"
+                                      title="プレビュー表示"
+                                    >
+                                      <Eye className="w-3.5 h-3.5 text-sky-400" />
+                                      <span className="text-[10px] hidden sm:inline">プレビュー</span>
+                                    </button>
 
-                                  {/* Preview button */}
-                                  <button
-                                    onClick={(e) => handlePreviewFile(file, e)}
-                                    className="p-1 text-slate-400 hover:text-sky-300 rounded hover:bg-sky-950/60 transition-colors"
-                                    title="プレビュー表示"
-                                  >
-                                    <Eye className="w-3.5 h-3.5" />
-                                  </button>
+                                    {/* Download button */}
+                                    <button
+                                      onClick={(e) => handleDownloadFile(file, e)}
+                                      className="px-2 py-1 text-slate-300 hover:text-emerald-300 rounded hover:bg-emerald-950/60 transition-colors flex items-center gap-1 text-[11px]"
+                                      title={`「${file.name}」をダウンロード`}
+                                    >
+                                      <Download className="w-3.5 h-3.5 text-emerald-400" />
+                                      <span className="text-[10px] hidden sm:inline">ダウンロード</span>
+                                    </button>
+                                  </div>
                                 </div>
                               );
                             })}

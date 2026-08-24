@@ -19,6 +19,7 @@ import {
   FileCode,
 } from "lucide-react";
 import * as XLSX from "xlsx";
+import { getCleanFilename, triggerFileDownload } from "../lib/fileUtils";
 
 export interface PreviewFile {
   id: string;
@@ -62,32 +63,9 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
     return letter;
   };
 
-  const getCleanFilename = (title: string, url?: string): string => {
-    if (!title) return "attached_file";
-    let clean = title.replace(/^📎\s*添付:\s*/, "").replace(/^添付:\s*/, "").trim();
-    clean = clean.replace(/\s*\([\d.]+\s*(?:B|KB|MB|GB)\)$/i, "").trim();
-    if (clean) return clean;
-    if (url && !url.startsWith("data:")) {
-      try {
-        const parts = url.split("/");
-        const last = parts[parts.length - 1].split("?")[0];
-        if (last) return decodeURIComponent(last);
-      } catch (err) {
-        // ignore
-      }
-    }
-    return "attached_file";
-  };
-
   const handleDownload = () => {
     if (!file.url) return;
-    const fileName = getCleanFilename(file.name, file.url);
-    const a = document.createElement("a");
-    a.href = file.url;
-    a.download = fileName;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+    triggerFileDownload(file.name, file.url);
   };
 
   const handlePrint = () => {
