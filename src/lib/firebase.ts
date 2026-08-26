@@ -75,15 +75,30 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
   console.error("Firestore Error: ", JSON.stringify(errInfo));
 }
 
-// Helper to remove `undefined` properties before sending to Firestore
-export function cleanForFirestore<T extends Record<string, any>>(obj: T): T {
-  const cleaned: Record<string, any> = {};
-  Object.keys(obj).forEach((key) => {
-    if (obj[key] !== undefined) {
-      cleaned[key] = obj[key];
+// Helper to recursively remove `undefined` properties before sending to Firestore
+export function cleanForFirestore<T>(data: T): T {
+  if (data === null || data === undefined) {
+    return data;
+  }
+  if (Array.isArray(data)) {
+    return data
+      .filter((item) => item !== undefined)
+      .map((item) => (typeof item === "object" && item !== null ? cleanForFirestore(item) : item)) as unknown as T;
+  }
+  if (typeof data === "object") {
+    if (data instanceof Date) {
+      return data;
     }
-  });
-  return cleaned as T;
+    const cleaned: Record<string, any> = {};
+    Object.keys(data as Record<string, any>).forEach((key) => {
+      const val = (data as Record<string, any>)[key];
+      if (val !== undefined) {
+        cleaned[key] = typeof val === "object" && val !== null ? cleanForFirestore(val) : val;
+      }
+    });
+    return cleaned as T;
+  }
+  return data;
 }
 
 // Sample initial staff members
@@ -181,18 +196,119 @@ export const INITIAL_SAMPLE_QUOTES: QuotationItem[] = [
   },
   {
     id: "quote-105",
-    title: "M/V GLOBAL PIONEER 航海計器レーダーマグネトロン交換品",
-    vesselName: "M/V GLOBAL PIONEER",
-    airportCodes: ["FRA"],
-    customsClearanceDate: "2026-08-15",
+    title: "OCEAN HARVEST 主機シリンダーライナー＆ピストンリング緊急手配",
+    vesselName: "OCEAN HARVEST",
+    airportCodes: ["LAX", "OSA"],
+    weightBreak: "+500kg",
+    customsClearanceDate: new Date().toISOString().split("T")[0],
+    shipperName: "GHI Inc",
+    etdDate: new Date().toISOString().split("T")[0],
+    etaDate: new Date(Date.now() + 86400000 * 6).toISOString().split("T")[0],
+    isUrgent: true,
+    status: "accepted",
+    arrangementUrgency: "risk",
+    assignedStaffId: "staff-1",
+    createdBy: "yamada.sales@marinetrade.co.jp",
+    arrangementTasks: {
+      1: { completed: true, completedBy: "喜多 健二", completedAt: new Date(Date.now() - 3600000 * 24).toISOString() },
+      2: { completed: true, completedBy: "喜多 健二", completedAt: new Date(Date.now() - 3600000 * 18).toISOString() },
+      3: { completed: true, completedBy: "喜多 健二", completedAt: new Date(Date.now() - 3600000 * 12).toISOString() },
+      4: { completed: false }, // Risk step 4 uncompleted
+      5: { completed: false },
+      6: { completed: false },
+      7: { completed: false },
+    },
+    createdAt: new Date(Date.now() - 3600000 * 72).toISOString(),
+    updatedAt: new Date(Date.now() - 3600000 * 4).toISOString(),
+    lastRepliedAt: new Date(Date.now() - 3600000 * 4).toISOString(),
+    readBy: ["saito.op@marinetrade.co.jp", "yamada.sales@marinetrade.co.jp", "kita@tac-japan.co.jp"],
+  },
+  {
+    id: "quote-107",
+    title: "CLEAN VISION 発電機エンジン冷却海水ポンプASSY急送",
+    vesselName: "CLEAN VISION",
+    airportCodes: ["ICN", "KIX"],
+    weightBreak: "+100kg",
+    customsClearanceDate: new Date(Date.now() + 86400000).toISOString().split("T")[0],
+    shipperName: "XYZ Trading",
+    etdDate: new Date(Date.now() + 86400000).toISOString().split("T")[0],
+    etaDate: new Date(Date.now() + 86400000 * 4).toISOString().split("T")[0],
     isUrgent: false,
     status: "accepted",
-    createdBy: "yamada.sales@marinetrade.co.jp",
+    arrangementUrgency: "in_progress",
+    assignedStaffId: "staff-1",
+    createdBy: "tanaka.air@marinetrade.co.jp",
+    arrangementTasks: {
+      1: { completed: true, completedBy: "喜多 健二", completedAt: new Date(Date.now() - 3600000 * 12).toISOString() },
+      2: { completed: true, completedBy: "喜多 健二", completedAt: new Date(Date.now() - 3600000 * 6).toISOString() },
+      3: { completed: false },
+      4: { completed: false },
+      5: { completed: false },
+      6: { completed: false },
+      7: { completed: false },
+    },
+    createdAt: new Date(Date.now() - 3600000 * 36).toISOString(),
+    updatedAt: new Date(Date.now() - 3600000 * 6).toISOString(),
+    lastRepliedAt: new Date(Date.now() - 3600000 * 6).toISOString(),
+    readBy: ["tanaka.air@marinetrade.co.jp"],
+  },
+  {
+    id: "quote-108",
+    title: "ALEXANDER ボイラー制御基板＆電磁弁スペアキット",
+    vesselName: "ALEXANDER",
+    airportCodes: ["HAM", "TYO"],
+    weightBreak: "-45kg",
+    customsClearanceDate: new Date(Date.now() + 86400000 * 2).toISOString().split("T")[0],
+    shipperName: "Nordic Parts AS",
+    etdDate: new Date(Date.now() + 86400000 * 2).toISOString().split("T")[0],
+    etaDate: new Date(Date.now() + 86400000 * 7).toISOString().split("T")[0],
+    isUrgent: false,
+    status: "accepted",
+    arrangementUrgency: "smooth",
     assignedStaffId: "staff-2",
-    createdAt: new Date(Date.now() - 3600000 * 72).toISOString(),
-    updatedAt: new Date(Date.now() - 3600000 * 18).toISOString(),
-    lastRepliedAt: new Date(Date.now() - 3600000 * 18).toISOString(),
+    createdBy: "saito.op@marinetrade.co.jp",
+    arrangementTasks: {
+      1: { completed: true, completedBy: "山田 太郎", completedAt: new Date(Date.now() - 3600000 * 20).toISOString() },
+      2: { completed: true, completedBy: "山田 太郎", completedAt: new Date(Date.now() - 3600000 * 15).toISOString() },
+      3: { completed: true, completedBy: "山田 太郎", completedAt: new Date(Date.now() - 3600000 * 10).toISOString() },
+      4: { completed: true, completedBy: "山田 太郎", completedAt: new Date(Date.now() - 3600000 * 5).toISOString() },
+      5: { completed: false },
+      6: { completed: false },
+      7: { completed: false },
+    },
+    createdAt: new Date(Date.now() - 3600000 * 48).toISOString(),
+    updatedAt: new Date(Date.now() - 3600000 * 5).toISOString(),
+    lastRepliedAt: new Date(Date.now() - 3600000 * 5).toISOString(),
     readBy: ["saito.op@marinetrade.co.jp", "yamada.sales@marinetrade.co.jp"],
+  },
+  {
+    id: "quote-109",
+    title: "MSC LORETTO 冷凍コンテナ用コンプレッサーバルブ急送",
+    vesselName: "MSC LORETTO",
+    airportCodes: ["NYC", "YOK"],
+    weightBreak: "+300kg",
+    customsClearanceDate: new Date(Date.now() + 86400000 * 4).toISOString().split("T")[0],
+    shipperName: "Global Marine Logistics",
+    etdDate: new Date(Date.now() + 86400000 * 4).toISOString().split("T")[0],
+    etaDate: new Date(Date.now() + 86400000 * 10).toISOString().split("T")[0],
+    isUrgent: false,
+    status: "accepted",
+    arrangementUrgency: "arranging",
+    assignedStaffId: "staff-1",
+    createdBy: "yamada.sales@marinetrade.co.jp",
+    arrangementTasks: {
+      1: { completed: true, completedBy: "喜多 健二", completedAt: new Date(Date.now() - 3600000 * 8).toISOString() },
+      2: { completed: true, completedBy: "喜多 健二", completedAt: new Date(Date.now() - 3600000 * 4).toISOString() },
+      3: { completed: false },
+      4: { completed: false },
+      5: { completed: false },
+      6: { completed: false },
+      7: { completed: false },
+    },
+    createdAt: new Date(Date.now() - 3600000 * 18).toISOString(),
+    updatedAt: new Date(Date.now() - 3600000 * 4).toISOString(),
+    lastRepliedAt: new Date(Date.now() - 3600000 * 4).toISOString(),
+    readBy: ["yamada.sales@marinetrade.co.jp"],
   },
   {
     id: "quote-106",

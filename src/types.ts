@@ -6,7 +6,32 @@ export type QuoteStatus =
   | "closed_or_on_hold";
 
 export type AppTheme = "light" | "dark" | "cute" | "digital";
-export type ActiveView = "kanban" | "sticky_board" | "history_search";
+export type ActiveView = "kanban" | "sticky_board" | "history_search" | "arrangement_progress";
+
+export interface ArrangementTaskItem {
+  id: number; // 1 to 7
+  key: string;
+  label: string; // e.g. "受託・手配開始"
+  subLabel: string; // e.g. "Booking確定"
+  shortName: string; // e.g. "Booking確定"
+}
+
+export const ARRANGEMENT_TASKS: ArrangementTaskItem[] = [
+  { id: 1, key: "booking", label: "受託・手配開始", subLabel: "Booking確定", shortName: "Booking確定" },
+  { id: 2, key: "invoice", label: "書類作成", subLabel: "インボイス", shortName: "インボイス" },
+  { id: 3, key: "warehouse", label: "倉庫へ依頼", subLabel: "業連・爆発物検査・搬入伝票FAX", shortName: "倉庫FAX" },
+  { id: 4, key: "customs", label: "通関手配", subLabel: "通関依頼", shortName: "通関依頼" },
+  { id: 5, key: "awb", label: "AWB発行", subLabel: "発行、KIXへ送る", shortName: "AWB発行" },
+  { id: 6, key: "ccsj", label: "CCSJ", subLabel: "データ送信", shortName: "CCSJ送信" },
+  { id: 7, key: "stock", label: "ストックリスト更新", subLabel: "在庫更新", shortName: "在庫更新" },
+];
+
+export interface ArrangementTaskStatus {
+  completed: boolean;
+  completedAt?: string;
+  completedBy?: string;
+  note?: string;
+}
 
 export type WeightBreak =
   | "MIN"
@@ -168,6 +193,16 @@ export interface QuotationItem {
   assignedStaffId?: string; // 担当者ID (任意)
   isArchived?: boolean; // アーカイブフラグ
   archivedAt?: string; // アーカイブ日時 (ISO string)
+
+  // 受託案件 手配進捗管理フィールド
+  shipperName?: string; // 荷主名 (e.g., "GHI Inc", "XYZ Trading")
+  etdDate?: string; // ETD 出発日 (YYYY-MM-DD or MM/DD)
+  etaDate?: string; // ETA 到着予定日 (YYYY-MM-DD or MM/DD)
+  flightOrVesselCode?: string; // 便名・船番 (e.g., "SQ619", "KE552")
+  arrangementTasks?: Record<number, ArrangementTaskStatus>; // 7つのタスク進行状況 (1..7)
+  arrangementMemo?: string; // 手配特記事項・社内メモ
+  arrangementUrgency?: "normal" | "risk" | "urgent" | "smooth" | "in_progress" | "arranging" | "completed"; // 手配状態手動指定
+  isArrangementCompleted?: boolean; // 全手配完了フラグ
 }
 
 export interface FilterOptions {

@@ -63,6 +63,7 @@ import { NotificationSettingsModal } from "./components/NotificationSettingsModa
 import { ToastContainer } from "./components/ToastContainer";
 import { SplashScreen } from "./components/SplashScreen";
 import { QuoteHistorySearch } from "./components/QuoteHistorySearch";
+import { ArrangementProgressView } from "./components/ArrangementProgressView";
 import { AnimatePresence } from "motion/react";
 
 export default function App() {
@@ -210,7 +211,7 @@ export default function App() {
 
     // 3. Load Active View / Screen Mode for current user
     const savedView = localStorage.getItem(`app_active_view_${userKey}`);
-    if (savedView && (savedView === "kanban" || savedView === "sticky_board" || savedView === "email")) {
+    if (savedView && (savedView === "kanban" || savedView === "sticky_board" || savedView === "history_search" || savedView === "arrangement_progress")) {
       setActiveView(savedView as ActiveView);
     }
 
@@ -269,7 +270,7 @@ export default function App() {
       } catch (e) {}
     }
     const saved = localStorage.getItem(`app_active_view_${initialUserEmail}`);
-    if (saved && (saved === "kanban" || saved === "sticky_board" || saved === "email")) {
+    if (saved && (saved === "kanban" || saved === "sticky_board" || saved === "history_search" || saved === "arrangement_progress")) {
       return saved as ActiveView;
     }
     return "kanban";
@@ -1424,6 +1425,7 @@ export default function App() {
               onSelectQuote={(q) => setSelectedQuoteId(q.id)}
               onStatusChange={handleStatusChange}
               onArchiveQuote={handleArchiveQuote}
+              onOpenArrangementProgress={() => handleSetActiveView("arrangement_progress")}
             />
             <KanbanChatWindow
               currentUser={currentUser}
@@ -1437,6 +1439,17 @@ export default function App() {
               onTyping={handleTypingChatMessage}
             />
           </>
+        ) : activeView === "arrangement_progress" ? (
+          <ArrangementProgressView
+            quotes={quotes}
+            messages={messages}
+            currentUser={currentUser}
+            staffMembers={staffMembers}
+            currentTheme={theme}
+            onBackToKanban={() => handleSetActiveView("kanban")}
+            onSelectQuote={(q) => setSelectedQuoteId(q.id)}
+            onUpdateQuote={handleUpdateQuote}
+          />
         ) : activeView === "sticky_board" ? (
           <StickyBoard currentUser={currentUser} currentTheme={theme} />
         ) : (

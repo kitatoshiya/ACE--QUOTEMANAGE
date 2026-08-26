@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from "react";
 import { QuotationItem, QuoteMessage, QuoteStatus, StaffMember, StatusColumnConfig, UserProfile, isQuoteAssignedToUser, parseCustomsDateToTime } from "../types";
 import { KanbanCard } from "./KanbanCard";
-import { FileText, Send, CheckCircle2, RefreshCw, Award, ArchiveX, ArrowDown, AlertTriangle, AlertOctagon, Timer, Clock, Filter } from "lucide-react";
+import { FileText, Send, CheckCircle2, RefreshCw, Award, ArchiveX, ArrowDown, AlertTriangle, AlertOctagon, Timer, Clock, Filter, Calendar } from "lucide-react";
 import { getElapsedStats } from "../lib/timeUtils";
 
 interface KanbanBoardProps {
@@ -13,6 +13,7 @@ interface KanbanBoardProps {
   onStatusChange: (quoteId: string, newStatus: QuoteStatus) => void;
   onArchiveQuote?: (quoteId: string) => void;
   onNewQuoteInStatus?: (status: QuoteStatus) => void;
+  onOpenArrangementProgress?: () => void;
 }
 
 export const KANBAN_COLUMNS: StatusColumnConfig[] = [
@@ -61,6 +62,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
   onSelectQuote,
   onStatusChange,
   onArchiveQuote,
+  onOpenArrangementProgress,
 }) => {
   const [activeDragOverCol, setActiveDragOverCol] = useState<QuoteStatus | null>(null);
   const [staleFilterMode, setStaleFilterMode] = useState<"all" | "stale_only" | "stale_24h" | "stale_48h" | "stale_72h">("all");
@@ -302,6 +304,22 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                 </div>
 
                 <div className="flex items-center gap-1.5">
+                  {/* Accepted Column Quick Switcher Button */}
+                  {column.id === "accepted" && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onOpenArrangementProgress?.();
+                      }}
+                      className="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-extrabold rounded-lg bg-gradient-to-r from-cyan-600 via-sky-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white shadow-xs hover:shadow-cyan-500/30 transition-all cursor-pointer transform hover:scale-105 active:scale-95"
+                      title="通関日・ETD基準の「受託手配進捗タイムライン」画面を開く"
+                    >
+                      <Calendar className="w-3 h-3 text-cyan-200" />
+                      <span>受託手配進捗 ➔</span>
+                    </button>
+                  )}
+
                   {/* Column Stale Warning Pill */}
                   {staleInCol > 0 && (
                     <span

@@ -13,8 +13,19 @@ import {
   MessageSquare,
   GripVertical,
   UserCheck,
+  CheckCircle2,
+  Calendar,
 } from "lucide-react";
-import { QuotationItem, QuoteStatus, StaffMember, UserProfile, formatCustomsDate, isQuoteAssignedToUser } from "../types";
+import {
+  QuotationItem,
+  QuoteStatus,
+  StaffMember,
+  UserProfile,
+  formatCustomsDate,
+  isQuoteAssignedToUser,
+  ARRANGEMENT_TASKS,
+  parseCustomsDateToTime,
+} from "../types";
 import { getAirportLabel } from "../lib/iataAirports";
 import { getElapsedStats } from "../lib/timeUtils";
 
@@ -297,6 +308,95 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({
             >
               通関日：{formattedDate}
             </span>
+          </div>
+        );
+      })()}
+
+      {/* 受託案件（status === "accepted"）の簡易手配進捗インジケーター */}
+      {quote.status === "accepted" && (() => {
+        const tasks = quote.arrangementTasks || {};
+        const completedTasksCount = ARRANGEMENT_TASKS.filter((t) => tasks[t.id]?.completed).length;
+        const isAllDone = completedTasksCount === 7 || quote.isArrangementCompleted;
+        
+        // Check risk
+        const customsTime = parseCustomsDateToTime(quote.customsClearanceDate || quote.grossWeight);
+        const now = Date.now();
+        const isOverdueOrToday = customsTime !== Infinity && customsTime <= now + 24 * 60 * 60 * 1000;
+        const isRisk = (quote.arrangementUrgency === "risk") || (isOverdueOrToday && !tasks[4]?.completed && !isAllDone);
+
+        let statusText = `${completedTasksCount}/7 完了`;
+        let statusBadgeClass = "bg-sky-950 text-sky-300 border-sky-700";
+
+        if (isAllDone) {
+          statusText = "全手配完了";
+          statusBadgeClass = "bg-emerald-950 text-emerald-300 border-emerald-600 font-bold";
+        } else if (isRisk) {
+          statusText = "通関要確認";
+          statusBadgeClass = "bg-rose-950 text-rose-300 border-rose-600 font-bold animate-pulse";
+        } else if (completedTasksCount >= 4) {
+          statusText = `${completedTasksCount}/7 順調`;
+          statusBadgeClass = "bg-teal-950 text-teal-300 border-teal-600";
+        } else if (completedTasksCount > 0) {
+          statusText = `${completedTasksCount}/7 進行中`;
+          statusBadgeClass = "bg-amber-950 text-amber-300 border-amber-600";
+        }
+
+        return (
+          <div className="my-2 p-2 rounded-lg bg-slate-950/80 border border-slate-800 shadow-inner">
+            <div className="flex items-center justify-between gap-1 mb-1.5">
+              <div className="flex items-center gap-1.5">
+                <span className="text-[10px] font-extrabold text-slate-300 flex items-center gap-1">
+                  <span className={`w-1.5 h-1.5 rounded-full ${isAllDone ? "bg-emerald-400" : isRisk ? "bg-rose-500 animate-ping" : "bg-cyan-400"}`} />
+                  手配進捗:
+                </span>
+                <span className={`px-1.5 py-0.2 rounded text-[9px] font-bold border ${statusBadgeClass}`}>
+                  {statusText}
+                </span>
+              </div>
+
+              {quote.etdDate && (
+                <span className="text-[9px] text-slate-400 font-mono">
+                  ETD: <strong className="text-slate-200">{quote.etdDate}</strong>
+                </span>
+              )}
+            </div>
+
+            {/* 7-Step Mini Progress Dots / Bars */}
+            <div className="grid grid-cols-7 gap-1 pt-0.5">
+              {ARRANGEMENT_TASKS.map((task) => {
+                const isDone = Boolean(tasks[task.id]?.completed);
+                const isRiskStep = isRisk && !isDone && task.id === 4;
+
+                return (
+                  <div
+                    key={task.id}
+                    className="flex flex-col items-center group/step relative"
+                    title={`${task.id}. ${task.label} (${task.subLabel}) : ${isDone ? "完了済" : "未完了"}`}
+                  >
+                    <div
+                      className={`w-full h-1.5 rounded-full transition-all ${
+                        isDone
+                          ? "bg-emerald-400 shadow-xs shadow-emerald-400/50"
+                          : isRiskStep
+                          ? "bg-rose-500 ring-1 ring-rose-400 animate-pulse"
+                          : "bg-slate-800 border border-slate-700"
+                      }`}
+                    />
+                    <span
+                      className={`text-[8px] font-mono font-bold mt-0.5 ${
+                        isDone
+                          ? "text-emerald-400 font-black"
+                          : isRiskStep
+                          ? "text-rose-400 font-black"
+                          : "text-slate-500"
+                      }`}
+                    >
+                      {task.id}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         );
       })()}

@@ -25,6 +25,7 @@ import {
   Bell,
   Play,
   SlidersHorizontal,
+  Calendar,
 } from "lucide-react";
 import { ActiveView, AppTheme, FilterOptions, QuotationItem, QuoteMessage, StaffMember, UserProfile } from "../types";
 import { POPULAR_IATA_AIRPORTS } from "../lib/iataAirports";
@@ -170,7 +171,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             </div>
           </div>
 
-          {/* View Mode Switcher (表：カンバン画面 / 裏：裏画面 付箋ボード / 履歴：見積履歴検索) */}
+          {/* View Mode Switcher (表：カンバン画面 / 手配進捗：受託手配進捗 / 裏：裏画面 付箋ボード / 履歴：見積履歴検索) */}
           <div className="flex items-center bg-slate-900/90 p-1 rounded-xl border border-slate-700/80 shadow-inner shrink-0">
             <button
               onClick={() => onActiveViewChange("kanban")}
@@ -183,6 +184,26 @@ export const Navbar: React.FC<NavbarProps> = ({
               <KanbanIcon className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">カンバン画面</span>
               <span className="sm:hidden">表</span>
+            </button>
+            <button
+              onClick={() => onActiveViewChange("arrangement_progress")}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-black transition-all ${
+                activeView === "arrangement_progress"
+                  ? "bg-gradient-to-r from-cyan-600 via-sky-600 to-blue-600 text-white shadow-md scale-100 ring-1 ring-cyan-400/50"
+                  : "text-slate-400 hover:text-cyan-300 hover:bg-slate-800/60"
+              }`}
+              title="受託した案件の日程タイムライン＆7ステップ進捗管理"
+            >
+              <Calendar className="w-3.5 h-3.5 text-cyan-400" />
+              <span className="hidden sm:inline">受託手配進捗</span>
+              <span className="sm:hidden">進捗</span>
+              {acceptedCount > 0 && (
+                <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-black ${
+                  activeView === "arrangement_progress" ? "bg-white text-cyan-900" : "bg-cyan-950 text-cyan-300 border border-cyan-700"
+                }`}>
+                  {acceptedCount}
+                </span>
+              )}
             </button>
             <button
               onClick={() => onActiveViewChange("sticky_board")}
