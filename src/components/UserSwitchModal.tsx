@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { X, User, Check, Mail, ShieldCheck, UserPlus, Edit2, Hash, LogOut, CheckCircle2 } from "lucide-react";
+import { X, User, Check, Mail, ShieldCheck, UserPlus, Edit2, Hash, LogOut, CheckCircle2, Activity } from "lucide-react";
 import { StaffMember, UserProfile } from "../types";
 import { auth } from "../lib/firebase";
 import { signOut } from "firebase/auth";
@@ -12,6 +12,7 @@ interface UserSwitchModalProps {
   onSelectUser: (user: UserProfile) => void;
   onUpdateCurrentUserProfile: (name: string, employeeNumber?: string) => void;
   onOpenAuthModal: () => void;
+  onOpenFirestoreMonitor?: () => void;
 }
 
 export const UserSwitchModal: React.FC<UserSwitchModalProps> = ({
@@ -22,6 +23,7 @@ export const UserSwitchModal: React.FC<UserSwitchModalProps> = ({
   onSelectUser,
   onUpdateCurrentUserProfile,
   onOpenAuthModal,
+  onOpenFirestoreMonitor,
 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState(currentUser.name);
@@ -258,7 +260,23 @@ export const UserSwitchModal: React.FC<UserSwitchModalProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-end px-6 py-3 bg-slate-100 dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 shrink-0">
+        <div className="flex items-center justify-between px-6 py-3 bg-slate-100 dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 shrink-0">
+          <div>
+            {onOpenFirestoreMonitor && (
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  onOpenFirestoreMonitor();
+                }}
+                className="inline-flex items-center gap-1.5 text-[11px] text-slate-400 hover:text-sky-500 transition-colors font-mono cursor-pointer"
+                title="Firestore 読み取りメトリクス & クォータ監視を開く"
+              >
+                <Activity className="w-3.5 h-3.5 text-amber-500" />
+                <span>DB Telemetry (Quota)</span>
+              </button>
+            )}
+          </div>
           <button
             onClick={onClose}
             className="px-5 py-1.5 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-lg text-xs transition-colors"

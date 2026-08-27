@@ -14,6 +14,7 @@ import {
 import { getAuth, Auth, onAuthStateChanged } from "firebase/auth";
 import firebaseConfigJson from "../../firebase-applet-config.json";
 import { StaffMember, QuotationItem, QuoteMessage, QuoteStatus, StickyNote, ChatMessage } from "../types";
+import { recordFirestoreQuotaError } from "./firestoreMonitor";
 
 let app: FirebaseApp;
 let db: Firestore | null = null;
@@ -56,8 +57,9 @@ export interface FirestoreErrorInfo {
 }
 
 export function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
+  const errMsg = error instanceof Error ? error.message : String(error);
   const errInfo: FirestoreErrorInfo = {
-    error: error instanceof Error ? error.message : String(error),
+    error: errMsg,
     authInfo: {
       userId: auth?.currentUser?.uid,
       email: auth?.currentUser?.email,
@@ -73,6 +75,9 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
     path,
   };
   console.error("Firestore Error: ", JSON.stringify(errInfo));
+  if (errMsg.toLowerCase().includes("quota") || errMsg.toLowerCase().includes("limit exceeded")) {
+    recordFirestoreQuotaError(path, errMsg, auth?.currentUser?.email || undefined);
+  }
 }
 
 // Helper to recursively remove `undefined` properties before sending to Firestore

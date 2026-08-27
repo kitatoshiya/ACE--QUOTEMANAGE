@@ -65,6 +65,9 @@ import { SplashScreen } from "./components/SplashScreen";
 import { QuoteHistorySearch } from "./components/QuoteHistorySearch";
 import { ArrangementProgressView } from "./components/ArrangementProgressView";
 import { StockExtractorView } from "./components/StockExtractorView";
+import { FirestoreUsageMonitorView } from "./components/FirestoreUsageMonitorView";
+import { recordFirestoreRead } from "./lib/firestoreMonitor";
+import { Activity } from "lucide-react";
 import { AnimatePresence } from "motion/react";
 
 export default function App() {
@@ -157,80 +160,84 @@ export default function App() {
     if (!currentUser?.email) return;
     const userKey = currentUser.email.toLowerCase();
 
-    // 1. Load Background for current user
+    // 1. Load Background for current user (Cache-First)
     const savedBg = localStorage.getItem(`app_background_${userKey}`);
     if (savedBg) {
       try {
         setAppBackground(JSON.parse(savedBg));
       } catch (e) {
-        // ignore
+        setAppBackground({ type: "default", value: "" });
       }
     } else {
       setAppBackground({ type: "default", value: "" });
+      // Only fetch from Firestore if not cached locally
+      if (db) {
+        getDoc(doc(db, "user_backgrounds", userKey))
+          .then((snap) => {
+            recordFirestoreRead("user_backgrounds", 1, "get_doc", "初回設定取得", currentUser?.email);
+            if (snap.exists()) {
+              const remoteBg = snap.data() as AppBackground;
+              setAppBackground(remoteBg);
+              localStorage.setItem(`app_background_${userKey}`, JSON.stringify(remoteBg));
+            }
+          })
+          .catch((err) => {
+            handleFirestoreError(err, OperationType.GET, `user_backgrounds/${userKey}`);
+          });
+      }
     }
 
-    if (db) {
-      getDoc(doc(db, "user_backgrounds", userKey))
-        .then((snap) => {
-          if (snap.exists()) {
-            const remoteBg = snap.data() as AppBackground;
-            setAppBackground(remoteBg);
-            localStorage.setItem(`app_background_${userKey}`, JSON.stringify(remoteBg));
-          }
-        })
-        .catch((err) => {
-          handleFirestoreError(err, OperationType.GET, `user_backgrounds/${userKey}`);
-        });
-    }
-
-    // 2. Load Notification Preferences for current user
+    // 2. Load Notification Preferences for current user (Cache-First)
     const savedPrefs = localStorage.getItem(`notification_prefs_${userKey}`);
     if (savedPrefs) {
       try {
         setNotificationPreferences(normalizeNotificationPreferences(JSON.parse(savedPrefs)));
       } catch (e) {
-        // ignore
+        setNotificationPreferences(DEFAULT_NOTIFICATION_PREFERENCES);
       }
     } else {
       setNotificationPreferences(DEFAULT_NOTIFICATION_PREFERENCES);
-    }
-
-    if (db) {
-      getDoc(doc(db, "user_notification_prefs", userKey))
-        .then((snap) => {
-          if (snap.exists()) {
-            const remotePrefs = snap.data() as NotificationPreferences;
-            const normalized = normalizeNotificationPreferences(remotePrefs);
-            setNotificationPreferences(normalized);
-            localStorage.setItem(`notification_prefs_${userKey}`, JSON.stringify(normalized));
-          }
-        })
-        .catch((err) => {
-          handleFirestoreError(err, OperationType.GET, `user_notification_prefs/${userKey}`);
-        });
-    }
-
-    // 3. Load Active View / Screen Mode for current user
-    const savedView = localStorage.getItem(`app_active_view_${userKey}`);
-    if (savedView && (savedView === "kanban" || savedView === "sticky_board" || savedView === "history_search" || savedView === "arrangement_progress" || savedView === "stock_extractor")) {
-      setActiveView(savedView as ActiveView);
-    }
-
-    if (db) {
-      getDoc(doc(db, "user_active_views", userKey))
-        .then((snap) => {
-          if (snap.exists()) {
-            const data = snap.data();
-            if (data?.activeView) {
-              const remoteView = data.activeView as ActiveView;
-              setActiveView(remoteView);
-              localStorage.setItem(`app_active_view_${userKey}`, remoteView);
+      // Only fetch from Firestore if not cached locally
+      if (db) {
+        getDoc(doc(db, "user_notification_prefs", userKey))
+          .then((snap) => {
+            recordFirestoreRead("user_notification_prefs", 1, "get_doc", "初回通知設定取得", currentUser?.email);
+            if (snap.exists()) {
+              const remotePrefs = snap.data() as NotificationPreferences;
+              const normalized = normalizeNotificationPreferences(remotePrefs);
+              setNotificationPreferences(normalized);
+              localStorage.setItem(`notification_prefs_${userKey}`, JSON.stringify(normalized));
             }
-          }
-        })
-        .catch((err) => {
-          handleFirestoreError(err, OperationType.GET, `user_active_views/${userKey}`);
-        });
+          })
+          .catch((err) => {
+            handleFirestoreError(err, OperationType.GET, `user_notification_prefs/${userKey}`);
+          });
+      }
+    }
+
+    // 3. Load Active View / Screen Mode for current user (Cache-First)
+    const savedView = localStorage.getItem(`app_active_view_${userKey}`);
+    if (savedView && (savedView === "kanban" || savedView === "sticky_board" || savedView === "history_search" || savedView === "arrangement_progress" || savedView === "stock_extractor" || savedView === "firestore_monitor")) {
+      setActiveView(savedView as ActiveView);
+    } else {
+      // Only fetch from Firestore if not cached locally
+      if (db) {
+        getDoc(doc(db, "user_active_views", userKey))
+          .then((snap) => {
+            recordFirestoreRead("user_active_views", 1, "get_doc", "初回画面設定取得", currentUser?.email);
+            if (snap.exists()) {
+              const data = snap.data();
+              if (data?.activeView) {
+                const remoteView = data.activeView as ActiveView;
+                setActiveView(remoteView);
+                localStorage.setItem(`app_active_view_${userKey}`, remoteView);
+              }
+            }
+          })
+          .catch((err) => {
+            handleFirestoreError(err, OperationType.GET, `user_active_views/${userKey}`);
+          });
+      }
     }
   }, [currentUser.email]);
 
@@ -271,7 +278,7 @@ export default function App() {
       } catch (e) {}
     }
     const saved = localStorage.getItem(`app_active_view_${initialUserEmail}`);
-    if (saved && (saved === "kanban" || saved === "sticky_board" || saved === "history_search" || saved === "arrangement_progress" || saved === "stock_extractor")) {
+    if (saved && (saved === "kanban" || saved === "sticky_board" || saved === "history_search" || saved === "arrangement_progress" || saved === "stock_extractor" || saved === "firestore_monitor")) {
       return saved as ActiveView;
     }
     return "kanban";
@@ -350,6 +357,7 @@ export default function App() {
     const unsubscribe = onSnapshot(
       colRef,
       (snapshot) => {
+        recordFirestoreRead("staffMembers", snapshot.size || 1, "snapshot_update", undefined, currentUser?.email);
         if (snapshot.empty) {
           // Initial seed if empty
           INITIAL_SAMPLE_STAFF.forEach((s) => {
@@ -382,6 +390,7 @@ export default function App() {
     const unsubscribe = onSnapshot(
       colRef,
       (snapshot) => {
+        recordFirestoreRead("quotations", snapshot.size || 1, "snapshot_update", undefined, currentUser?.email);
         if (snapshot.empty) {
           // Initial seed if empty
           INITIAL_SAMPLE_QUOTES.forEach((q) => {
@@ -448,6 +457,7 @@ export default function App() {
     const unsubscribe = onSnapshot(
       colRef,
       (snapshot) => {
+        recordFirestoreRead("messages", snapshot.size || 1, "snapshot_update", undefined, currentUser?.email);
         if (snapshot.empty) {
           // Initial seed if empty
           INITIAL_SAMPLE_MESSAGES.forEach((m) => {
@@ -1302,6 +1312,18 @@ export default function App() {
     }
   };
 
+  // Keyboard shortcut: Ctrl+Shift+D or Cmd+Shift+D to toggle Firestore monitor
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === "D" || e.key === "d")) {
+        e.preventDefault();
+        setActiveView((prev) => (prev === "firestore_monitor" ? "kanban" : "firestore_monitor"));
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
   // Data Restore / Import JSON
   const handleRestoreData = (
     restoredQuotes: QuotationItem[],
@@ -1457,6 +1479,12 @@ export default function App() {
             currentUser={currentUser}
             onBackToKanban={() => handleSetActiveView("kanban")}
           />
+        ) : activeView === "firestore_monitor" ? (
+          <FirestoreUsageMonitorView
+            currentTheme={theme}
+            currentUser={currentUser}
+            onBackToKanban={() => handleSetActiveView("kanban")}
+          />
         ) : activeView === "sticky_board" ? (
           <StickyBoard currentUser={currentUser} currentTheme={theme} />
         ) : (
@@ -1514,6 +1542,7 @@ export default function App() {
         messages={messages}
         staffMembers={staffMembers}
         onRestoreData={handleRestoreData}
+        onOpenFirestoreMonitor={() => handleSetActiveView("firestore_monitor")}
       />
 
       <UserSwitchModal
@@ -1524,6 +1553,7 @@ export default function App() {
         onSelectUser={setCurrentUser}
         onUpdateCurrentUserProfile={handleUpdateCurrentUserProfile}
         onOpenAuthModal={() => setIsAuthModalOpen(true)}
+        onOpenFirestoreMonitor={() => handleSetActiveView("firestore_monitor")}
       />
 
       <AuthModal
@@ -1569,6 +1599,32 @@ export default function App() {
 
       {/* Screen Window Toast Message Popup Notifications */}
       <ToastContainer />
+
+      {/* Discrete Bottom System Telemetry Status Bar (Minimalist & Low-profile trigger) */}
+      <div className={`px-4 py-1 border-t text-[10px] flex items-center justify-between opacity-50 hover:opacity-100 transition-opacity select-none ${
+        theme === "light"
+          ? "bg-slate-100/60 border-slate-200 text-slate-500"
+          : theme === "digital"
+          ? "bg-[#040e08] border-emerald-950 text-emerald-600"
+          : "bg-slate-950/80 border-slate-900 text-slate-500"
+      }`}>
+        <div className="flex items-center gap-2">
+          <span>ACE Marine Logistics Platform v2.4</span>
+          <span>•</span>
+          <span>Status: Normal</span>
+        </div>
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => handleSetActiveView(activeView === "firestore_monitor" ? "kanban" : "firestore_monitor")}
+            className="inline-flex items-center gap-1 font-mono hover:text-sky-500 transition-colors cursor-pointer"
+            title="Firestore 読み取りメトリクス & クォータ監視 (Ctrl+Shift+D)"
+          >
+            <Activity className="w-3 h-3 text-amber-500" />
+            <span>⚡ DB Telemetry (Quota)</span>
+          </button>
+        </div>
+      </div>
 
       {/* Startup & Interactive Splash Screen (Modal Popup) */}
       <AnimatePresence>

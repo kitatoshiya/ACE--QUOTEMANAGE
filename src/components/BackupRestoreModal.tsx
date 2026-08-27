@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { X, Download, Upload, CheckCircle2, AlertTriangle, FileJson } from "lucide-react";
+import { X, Download, Upload, CheckCircle2, AlertTriangle, FileJson, Activity } from "lucide-react";
 import { BackupData, QuotationItem, QuoteMessage, StaffMember } from "../types";
 
 interface BackupRestoreModalProps {
@@ -13,6 +13,7 @@ interface BackupRestoreModalProps {
     messages: QuoteMessage[],
     staffMembers?: StaffMember[]
   ) => void;
+  onOpenFirestoreMonitor?: () => void;
 }
 
 export const BackupRestoreModal: React.FC<BackupRestoreModalProps> = ({
@@ -22,6 +23,7 @@ export const BackupRestoreModal: React.FC<BackupRestoreModalProps> = ({
   messages,
   staffMembers,
   onRestoreData,
+  onOpenFirestoreMonitor,
 }) => {
   const [importStatus, setImportStatus] = useState<string | null>(null);
   const [errorStatus, setErrorStatus] = useState<string | null>(null);
@@ -166,7 +168,23 @@ export const BackupRestoreModal: React.FC<BackupRestoreModalProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-end px-6 py-4 bg-slate-50 dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800">
+        <div className="flex items-center justify-between px-6 py-3.5 bg-slate-50 dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800">
+          <div>
+            {onOpenFirestoreMonitor && (
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  onOpenFirestoreMonitor();
+                }}
+                className="inline-flex items-center gap-1.5 text-[11px] text-slate-400 hover:text-sky-500 transition-colors font-mono cursor-pointer"
+                title="Firestore 読み取りメトリクス & クォータ監視を開く"
+              >
+                <Activity className="w-3.5 h-3.5 text-amber-500" />
+                <span>DB Telemetry (Quota)</span>
+              </button>
+            )}
+          </div>
           <button
             onClick={onClose}
             className="px-4 py-2 bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 text-slate-700 dark:text-slate-300 font-medium rounded-lg text-xs"
