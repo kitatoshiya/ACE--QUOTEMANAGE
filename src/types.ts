@@ -6,7 +6,7 @@ export type QuoteStatus =
   | "closed_or_on_hold";
 
 export type AppTheme = "light" | "dark" | "cute" | "digital";
-export type ActiveView = "kanban" | "sticky_board" | "history_search" | "arrangement_progress";
+export type ActiveView = "kanban" | "sticky_board" | "history_search" | "arrangement_progress" | "stock_extractor";
 
 export interface ArrangementTaskItem {
   id: number; // 1 to 7

@@ -64,6 +64,7 @@ import { ToastContainer } from "./components/ToastContainer";
 import { SplashScreen } from "./components/SplashScreen";
 import { QuoteHistorySearch } from "./components/QuoteHistorySearch";
 import { ArrangementProgressView } from "./components/ArrangementProgressView";
+import { StockExtractorView } from "./components/StockExtractorView";
 import { AnimatePresence } from "motion/react";
 
 export default function App() {
@@ -211,7 +212,7 @@ export default function App() {
 
     // 3. Load Active View / Screen Mode for current user
     const savedView = localStorage.getItem(`app_active_view_${userKey}`);
-    if (savedView && (savedView === "kanban" || savedView === "sticky_board" || savedView === "history_search" || savedView === "arrangement_progress")) {
+    if (savedView && (savedView === "kanban" || savedView === "sticky_board" || savedView === "history_search" || savedView === "arrangement_progress" || savedView === "stock_extractor")) {
       setActiveView(savedView as ActiveView);
     }
 
@@ -270,7 +271,7 @@ export default function App() {
       } catch (e) {}
     }
     const saved = localStorage.getItem(`app_active_view_${initialUserEmail}`);
-    if (saved && (saved === "kanban" || saved === "sticky_board" || saved === "history_search" || saved === "arrangement_progress")) {
+    if (saved && (saved === "kanban" || saved === "sticky_board" || saved === "history_search" || saved === "arrangement_progress" || saved === "stock_extractor")) {
       return saved as ActiveView;
     }
     return "kanban";
@@ -1449,6 +1450,12 @@ export default function App() {
             onBackToKanban={() => handleSetActiveView("kanban")}
             onSelectQuote={(q) => setSelectedQuoteId(q.id)}
             onUpdateQuote={handleUpdateQuote}
+          />
+        ) : activeView === "stock_extractor" ? (
+          <StockExtractorView
+            currentTheme={theme}
+            currentUser={currentUser}
+            onBackToKanban={() => handleSetActiveView("kanban")}
           />
         ) : activeView === "sticky_board" ? (
           <StickyBoard currentUser={currentUser} currentTheme={theme} />

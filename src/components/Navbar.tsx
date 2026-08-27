@@ -26,6 +26,7 @@ import {
   Play,
   SlidersHorizontal,
   Calendar,
+  FileSpreadsheet,
 } from "lucide-react";
 import { ActiveView, AppTheme, FilterOptions, QuotationItem, QuoteMessage, StaffMember, UserProfile } from "../types";
 import { POPULAR_IATA_AIRPORTS } from "../lib/iataAirports";
@@ -155,19 +156,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 }`}>
                   ACE船用品輸出管理 <span className={`${currentTheme === 'cute' ? 'text-pink-600 font-bold' : currentTheme === 'digital' ? 'text-emerald-400 font-mono tracking-widest' : 'text-sky-600 font-extrabold'}`}>見積管理</span>
                 </h1>
-                <span className={`hidden md:inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold ${
-                  currentTheme === "light"
-                    ? "bg-white text-sky-900 border border-sky-300 shadow-2xs"
-                    : currentTheme === "digital"
-                    ? "bg-emerald-950 text-emerald-300 border border-emerald-700/80 font-mono"
-                    : "bg-sky-950 text-sky-300 border border-sky-800/60"
-                }`}>
-                  <Plane className="w-3 h-3 mr-1" /> Firebase + Gemini API
-                </span>
               </div>
-              <p className={`text-xs hidden sm:block ${currentTheme === "light" ? "text-slate-700 font-bold" : currentTheme === "digital" ? "text-emerald-600 font-mono" : "text-slate-400"}`}>
-                {currentTheme === "digital" ? "[SYSTEM // MARINE_SPARE_PARTS_AIR_FREIGHT_HUB]" : "Marine Spare Parts Air Freight Quotation & Thread Hub"}
-              </p>
             </div>
           </div>
 
@@ -204,6 +193,19 @@ export const Navbar: React.FC<NavbarProps> = ({
                   {acceptedCount}
                 </span>
               )}
+            </button>
+            <button
+              onClick={() => onActiveViewChange("stock_extractor")}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-black transition-all ${
+                activeView === "stock_extractor"
+                  ? "bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 text-white shadow-md scale-100 ring-1 ring-emerald-400/50"
+                  : "text-slate-400 hover:text-emerald-400 hover:bg-slate-800/60"
+              }`}
+              title="Excel/XLSMを解析し、未出荷(セルX空白)データのみを抽出・出力"
+            >
+              <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-400" />
+              <span className="hidden sm:inline">未出荷在庫抽出</span>
+              <span className="sm:hidden">在庫</span>
             </button>
             <button
               onClick={() => onActiveViewChange("sticky_board")}
