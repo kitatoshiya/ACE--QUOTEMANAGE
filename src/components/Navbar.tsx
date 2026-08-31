@@ -160,34 +160,33 @@ export const Navbar: React.FC<NavbarProps> = ({
             </div>
           </div>
 
-          {/* View Mode Switcher (表：カンバン画面 / 手配進捗：受託手配進捗 / 裏：裏画面 付箋ボード / 履歴：見積履歴検索) */}
-          <div className="flex items-center bg-slate-900/90 p-1 rounded-xl border border-slate-700/80 shadow-inner shrink-0">
+          {/* View Mode Switcher (Compact / Minimal Mode Switcher) */}
+          <div className="flex items-center bg-slate-900/90 p-0.5 rounded-lg border border-slate-700/80 shadow-sm shrink-0 gap-0.5">
             <button
               onClick={() => onActiveViewChange("kanban")}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-black transition-all ${
+              className={`flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-bold transition-all ${
                 activeView === "kanban"
-                  ? "bg-sky-600 text-white shadow-md scale-100"
+                  ? "bg-sky-600 text-white shadow-sm"
                   : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/60"
               }`}
+              title="カンバン画面"
             >
-              <KanbanIcon className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">カンバン画面</span>
-              <span className="sm:hidden">表</span>
+              <KanbanIcon className="w-3 h-3" />
+              <span>カンバン</span>
             </button>
             <button
               onClick={() => onActiveViewChange("arrangement_progress")}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-black transition-all ${
+              className={`flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-bold transition-all ${
                 activeView === "arrangement_progress"
-                  ? "bg-gradient-to-r from-cyan-600 via-sky-600 to-blue-600 text-white shadow-md scale-100 ring-1 ring-cyan-400/50"
+                  ? "bg-gradient-to-r from-cyan-600 via-sky-600 to-blue-600 text-white shadow-sm ring-1 ring-cyan-400/40"
                   : "text-slate-400 hover:text-cyan-300 hover:bg-slate-800/60"
               }`}
-              title="受託した案件の日程タイムライン＆7ステップ進捗管理"
+              title="受託手配進捗（日程タイムライン＆進捗管理）"
             >
-              <Calendar className="w-3.5 h-3.5 text-cyan-400" />
-              <span className="hidden sm:inline">受託手配進捗</span>
-              <span className="sm:hidden">進捗</span>
+              <Calendar className="w-3 h-3 text-cyan-400" />
+              <span>手配進捗</span>
               {acceptedCount > 0 && (
-                <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-black ${
+                <span className={`px-1 py-0 rounded-full text-[9px] font-black leading-none ${
                   activeView === "arrangement_progress" ? "bg-white text-cyan-900" : "bg-cyan-950 text-cyan-300 border border-cyan-700"
                 }`}>
                   {acceptedCount}
@@ -196,40 +195,39 @@ export const Navbar: React.FC<NavbarProps> = ({
             </button>
             <button
               onClick={() => onActiveViewChange("stock_extractor")}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-black transition-all ${
+              className={`flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-bold transition-all ${
                 activeView === "stock_extractor"
-                  ? "bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 text-white shadow-md scale-100 ring-1 ring-emerald-400/50"
+                  ? "bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 text-white shadow-sm ring-1 ring-emerald-400/40"
                   : "text-slate-400 hover:text-emerald-400 hover:bg-slate-800/60"
               }`}
-              title="Excel/XLSMを解析し、未出荷(セルX空白)データのみを抽出・出力"
+              title="未出荷在庫抽出（Excel/XLSM解析）"
             >
-              <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-400" />
-              <span className="hidden sm:inline">未出荷在庫抽出</span>
-              <span className="sm:hidden">在庫</span>
+              <FileSpreadsheet className="w-3 h-3 text-emerald-400" />
+              <span>在庫抽出</span>
             </button>
             <button
               onClick={() => onActiveViewChange("sticky_board")}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-black transition-all ${
+              className={`flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-bold transition-all ${
                 activeView === "sticky_board"
-                  ? "bg-gradient-to-r from-amber-500 via-amber-400 to-yellow-500 text-slate-950 shadow-md scale-100"
+                  ? "bg-gradient-to-r from-amber-500 via-amber-400 to-yellow-500 text-slate-950 shadow-sm"
                   : "text-slate-400 hover:text-amber-400 hover:bg-slate-800/60"
               }`}
+              title="裏画面 (付箋ボード)"
             >
-              <StickyIcon className="w-3.5 h-3.5 text-amber-400 fill-amber-400/20" />
-              <span className="hidden sm:inline">裏画面 (付箋ボード)</span>
-              <span className="sm:hidden">裏</span>
+              <StickyIcon className="w-3 h-3 text-amber-400 fill-amber-400/20" />
+              <span>付箋ボード</span>
             </button>
             <button
               onClick={() => onActiveViewChange("history_search")}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-black transition-all ${
+              className={`flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-bold transition-all ${
                 activeView === "history_search"
-                  ? "bg-gradient-to-r from-cyan-600 via-teal-600 to-sky-600 text-white shadow-md scale-100"
+                  ? "bg-gradient-to-r from-cyan-600 via-teal-600 to-sky-600 text-white shadow-sm"
                   : "text-slate-400 hover:text-cyan-400 hover:bg-slate-800/60"
               }`}
+              title="見積履歴検索"
             >
-              <Search className="w-3.5 h-3.5 text-cyan-400" />
-              <span className="hidden sm:inline font-bold">見積履歴検索</span>
-              <span className="sm:hidden">履歴</span>
+              <Search className="w-3 h-3 text-cyan-400" />
+              <span>履歴検索</span>
             </button>
           </div>
 
@@ -329,22 +327,6 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <SlidersHorizontal className="w-4 h-4 text-sky-400" />
               </button>
             </div>
-
-            {/* New Quote Button */}
-            <button
-              onClick={onOpenNewQuoteModal}
-              className={`flex items-center gap-1.5 px-3 sm:px-4 py-2 text-white text-xs font-black rounded-lg shadow-sm hover:shadow-md transition-all active:scale-95 ${
-                currentTheme === "cute"
-                  ? "bg-pink-500 hover:bg-pink-400 font-bold"
-                  : currentTheme === "digital"
-                  ? "bg-emerald-600 hover:bg-emerald-500 font-mono border border-emerald-400/50 shadow-emerald-600/30"
-                  : "bg-sky-600 hover:bg-sky-500 shadow-md"
-              }`}
-            >
-              <Plus className="w-4 h-4 stroke-[3]" />
-              <span className="hidden sm:inline">新規見積作成</span>
-              <span className="sm:hidden">新規</span>
-            </button>
 
             {/* Staff Master Button */}
             <button
@@ -496,8 +478,24 @@ export const Navbar: React.FC<NavbarProps> = ({
             })}
           </div>
 
-          {/* Right Side: Staff Member Filter, Urgent Toggle & Unread Counter */}
-          <div className="flex items-center gap-3 shrink-0 flex-wrap">
+          {/* Right Side: New Quote Button, Staff Member Filter, Urgent Toggle & Unread Counter */}
+          <div className="flex items-center gap-2.5 shrink-0 flex-wrap">
+            {/* New Quote Button */}
+            <button
+              onClick={onOpenNewQuoteModal}
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-white text-xs font-black rounded-lg shadow-sm hover:shadow-md transition-all active:scale-95 shrink-0 ${
+                currentTheme === "cute"
+                  ? "bg-pink-500 hover:bg-pink-400 font-bold"
+                  : currentTheme === "digital"
+                  ? "bg-emerald-600 hover:bg-emerald-500 font-mono border border-emerald-400/50 shadow-emerald-600/30"
+                  : "bg-sky-600 hover:bg-sky-500 shadow-md"
+              }`}
+            >
+              <Plus className="w-3.5 h-3.5 stroke-[3]" />
+              <span className="hidden sm:inline">新規見積作成</span>
+              <span className="sm:hidden">新規</span>
+            </button>
+
             {/* Staff Filter Dropdown */}
             <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md border text-xs font-bold ${
               currentTheme === "light"

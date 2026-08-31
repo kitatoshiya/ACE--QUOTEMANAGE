@@ -316,6 +316,73 @@ export default function App() {
   const [quotes, setQuotes] = useState<QuotationItem[]>(loadLocalQuotes);
   const [messages, setMessages] = useState<QuoteMessage[]>(loadLocalMessages);
 
+  // Synchronized refs for background real-time listeners (avoids tearing down and recreating Firestore listeners on state/preference changes)
+  const currentUserRef = React.useRef<UserProfile>(currentUser);
+  const staffMembersRef = React.useRef<StaffMember[]>(staffMembers);
+  const notificationPreferencesRef = React.useRef<NotificationPreferences>(notificationPreferences);
+  const messagesRef = React.useRef<QuoteMessage[]>(messages);
+
+  useEffect(() => {
+    currentUserRef.current = currentUser;
+  }, [currentUser]);
+
+  useEffect(() => {
+    staffMembersRef.current = staffMembers;
+  }, [staffMembers]);
+
+  useEffect(() => {
+    notificationPreferencesRef.current = notificationPreferences;
+  }, [notificationPreferences]);
+
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
+
+  // Helper to determine if notification should be dispatched for a status change / task addition / archive event
+  const shouldNotifyForQuoteEvent = (
+    quote: QuotationItem,
+    eventKey: keyof NotificationPreferences["notifyOnStatusChanges"],
+    customMessages?: QuoteMessage[],
+    actorEmail?: string
+  ): boolean => {
+    const prefs = notificationPreferencesRef.current;
+    const currentU = currentUserRef.current;
+    const staffList = staffMembersRef.current;
+    const allMsgs = messagesRef.current;
+
+    if (!prefs.desktopEnabled) return false;
+
+    // Do not notify the user who performed the action themselves
+    const activeActorEmail = actorEmail || quote.updatedBy;
+    if (activeActorEmail && activeActorEmail.toLowerCase() === currentU.email.toLowerCase()) {
+      return false;
+    }
+
+    const isEventEnabled = Boolean(prefs.notifyOnStatusChanges[eventKey]);
+    if (!isEventEnabled) return false;
+
+    if (prefs.statusChangeScope === "mentioned_only") {
+      const userEmailLower = currentU.email.toLowerCase();
+      const isAssigned =
+        quote.assignedStaffId &&
+        staffList.find((s) => s.id === quote.assignedStaffId)?.email.toLowerCase() === userEmailLower;
+      const isCreator = quote.createdBy.toLowerCase() === userEmailLower;
+
+      const msgsToCheck = customMessages || allMsgs.filter((m) => m.quoteId === quote.id);
+      const isMentionedInMsgs = msgsToCheck.some((m) =>
+        isUserMentioned(m.contentHtml, currentU, staffList)
+      );
+      const isMentionedInTitle = isUserMentioned(quote.title, currentU, staffList);
+      const isMentionedInVessel = isUserMentioned(quote.vesselName, currentU, staffList);
+
+      if (!isAssigned && !isCreator && !isMentionedInMsgs && !isMentionedInTitle && !isMentionedInVessel) {
+        return false;
+      }
+    }
+
+    return true;
+  };
+
   // Kanban Chat Messages state
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>(loadLocalChatMessages);
   const [chatTypingUsers, setChatTypingUsers] = useState<ChatTypingStatus[]>([]);
@@ -390,7 +457,7 @@ export default function App() {
     const unsubscribe = onSnapshot(
       colRef,
       (snapshot) => {
-        recordFirestoreRead("quotations", snapshot.size || 1, "snapshot_update", undefined, currentUser?.email);
+        recordFirestoreRead("quotations", snapshot.size || 1, "snapshot_update", undefined, currentUserRef.current?.email);
         if (snapshot.empty) {
           // Initial seed if empty
           INITIAL_SAMPLE_QUOTES.forEach((q) => {
@@ -447,7 +514,7 @@ export default function App() {
       }
     );
     return () => unsubscribe();
-  }, [currentUser, staffMembers, notificationPreferences, messages]);
+  }, []);
 
   // 3. Real-time Firestore Sync for Messages
   useEffect(() => {
@@ -457,7 +524,7 @@ export default function App() {
     const unsubscribe = onSnapshot(
       colRef,
       (snapshot) => {
-        recordFirestoreRead("messages", snapshot.size || 1, "snapshot_update", undefined, currentUser?.email);
+        recordFirestoreRead("messages", snapshot.size || 1, "snapshot_update", undefined, currentUserRef.current?.email);
         if (snapshot.empty) {
           // Initial seed if empty
           INITIAL_SAMPLE_MESSAGES.forEach((m) => {
@@ -489,14 +556,18 @@ export default function App() {
                 if (newMsg.isSystemLog) return;
                 if (isEventAlreadyNotified(newMsg.id) || isEventAlreadyNotified(`mention-${newMsg.id}`)) return;
 
+                const currentU = currentUserRef.current;
+                const currentStaff = staffMembersRef.current;
+                const currentPrefs = notificationPreferencesRef.current;
+
                 if (
-                  isUserMentioned(newMsg.contentHtml, currentUser, staffMembers) &&
-                  newMsg.authorEmail?.toLowerCase() !== currentUser.email?.toLowerCase()
+                  isUserMentioned(newMsg.contentHtml, currentU, currentStaff) &&
+                  newMsg.authorEmail?.toLowerCase() !== currentU.email?.toLowerCase()
                 ) {
                   markEventAsNotified(newMsg.id);
                   markEventAsNotified(`mention-${newMsg.id}`);
 
-                  if (notificationPreferences.desktopEnabled && notificationPreferences.notifyOnMentions) {
+                  if (currentPrefs.desktopEnabled && currentPrefs.notifyOnMentions) {
                     const timeStr = formatNotificationTimestamp(newMsg.createdAt);
                     triggerDesktopNotification(
                       `🔔 [メンション通知] ${newMsg.authorName || newMsg.authorEmail}さんからのメッセージ`,
@@ -519,7 +590,7 @@ export default function App() {
       }
     );
     return () => unsubscribe();
-  }, [currentUser, staffMembers, notificationPreferences]);
+  }, []);
 
   // 3b. Real-time Firestore Sync for Kanban Chat Messages
   useEffect(() => {
@@ -826,46 +897,6 @@ export default function App() {
   const unreadCount = useMemo(() => {
     return activeQuotes.filter((q) => !q.readBy?.includes(currentUser.email)).length;
   }, [activeQuotes, currentUser.email]);
-
-  // Helper to determine if notification should be dispatched for a status change / task addition / archive event
-  const shouldNotifyForQuoteEvent = (
-    quote: QuotationItem,
-    eventKey: keyof NotificationPreferences["notifyOnStatusChanges"],
-    customMessages?: QuoteMessage[],
-    actorEmail?: string
-  ): boolean => {
-    if (!notificationPreferences.desktopEnabled) return false;
-
-    // Do not notify the user who performed the action themselves
-    const activeActorEmail = actorEmail || quote.updatedBy;
-    if (activeActorEmail && activeActorEmail.toLowerCase() === currentUser.email.toLowerCase()) {
-      return false;
-    }
-
-    const isEventEnabled = Boolean(notificationPreferences.notifyOnStatusChanges[eventKey]);
-    if (!isEventEnabled) return false;
-
-    if (notificationPreferences.statusChangeScope === "mentioned_only") {
-      const userEmailLower = currentUser.email.toLowerCase();
-      const isAssigned =
-        quote.assignedStaffId &&
-        staffMembers.find((s) => s.id === quote.assignedStaffId)?.email.toLowerCase() === userEmailLower;
-      const isCreator = quote.createdBy.toLowerCase() === userEmailLower;
-
-      const msgsToCheck = customMessages || messages.filter((m) => m.quoteId === quote.id);
-      const isMentionedInMsgs = msgsToCheck.some((m) =>
-        isUserMentioned(m.contentHtml, currentUser, staffMembers)
-      );
-      const isMentionedInTitle = isUserMentioned(quote.title, currentUser, staffMembers);
-      const isMentionedInVessel = isUserMentioned(quote.vesselName, currentUser, staffMembers);
-
-      if (!isAssigned && !isCreator && !isMentionedInMsgs && !isMentionedInTitle && !isMentionedInVessel) {
-        return false;
-      }
-    }
-
-    return true;
-  };
 
   // Archive & Delete Handlers
   const handleArchiveQuote = (quoteId: string) => {
