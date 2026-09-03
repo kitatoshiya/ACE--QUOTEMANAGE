@@ -377,6 +377,44 @@ export const INITIAL_SAMPLE_MESSAGES: QuoteMessage[] = [
 const STORAGE_KEY_QUOTES = "marine_quotes_data_v1";
 const STORAGE_KEY_MESSAGES = "marine_messages_data_v1";
 const STORAGE_KEY_STAFF = "marine_staff_data_v1";
+const STORAGE_KEY_CHAT_MESSAGES = "marine_chat_messages_data_v1";
+
+/**
+ * Safe local storage setter with quota protection and fallback trimming
+ */
+function safeSetLocalStorage(key: string, value: string): boolean {
+  try {
+    localStorage.setItem(key, value);
+    return true;
+  } catch (err: any) {
+    const isQuota =
+      err?.name === "QuotaExceededError" ||
+      err?.name === "NS_ERROR_DOM_QUOTA_REACHED" ||
+      (typeof err?.message === "string" && err.message.toLowerCase().includes("quota"));
+
+    if (isQuota) {
+      console.warn(`LocalStorage quota reached for key "${key}". Attempting cleanup...`);
+      try {
+        // Remove legacy or large redundant storage items if present
+        const redundantKeys = [
+          "app_background",
+          "marine_messages_data_backup",
+          "marine_quotes_data_backup",
+        ];
+        redundantKeys.forEach((k) => localStorage.removeItem(k));
+
+        // Try setting again
+        localStorage.setItem(key, value);
+        return true;
+      } catch (retryErr) {
+        console.warn(`LocalStorage fallback cleanup could not store full key "${key}". Skipping offline cache write safely.`);
+        return false;
+      }
+    }
+    console.warn(`Failed to set localStorage key "${key}":`, err);
+    return false;
+  }
+}
 
 export function loadLocalStaff(): StaffMember[] {
   try {
@@ -391,9 +429,9 @@ export function loadLocalStaff(): StaffMember[] {
 
 export function saveLocalStaff(staff: StaffMember[]) {
   try {
-    localStorage.setItem(STORAGE_KEY_STAFF, JSON.stringify(staff));
+    safeSetLocalStorage(STORAGE_KEY_STAFF, JSON.stringify(staff));
   } catch (e) {
-    console.error("Failed to save local staff:", e);
+    console.warn("Could not save staff to localStorage:", e);
   }
 }
 
@@ -410,10 +448,43 @@ export function loadLocalQuotes(): QuotationItem[] {
 
 export function saveLocalQuotes(quotes: QuotationItem[]) {
   try {
-    localStorage.setItem(STORAGE_KEY_QUOTES, JSON.stringify(quotes));
+    // Keep most recent 100 quotes in local storage cache to keep storage footprint small
+    const trimmed = quotes.slice(0, 100);
+    const success = safeSetLocalStorage(STORAGE_KEY_QUOTES, JSON.stringify(trimmed));
+    if (!success && trimmed.length > 30) {
+      // Further trim if quota is tight
+      safeSetLocalStorage(STORAGE_KEY_QUOTES, JSON.stringify(trimmed.slice(0, 30)));
+    }
   } catch (e) {
-    console.error("Failed to save local quotes:", e);
+    console.warn("Could not save quotes to localStorage:", e);
   }
+}
+
+/**
+ * Sanitize message items for offline local cache (strips oversized inline base64/attachments)
+ */
+function sanitizeMessageForLocalCache(msg: QuoteMessage): QuoteMessage {
+  let content = msg.contentHtml || "";
+  // Strip large inline base64 images from HTML (> 10KB data URI) to prevent LocalStorage quota exhaustion
+  if (content.includes("data:image/") && content.length > 10240) {
+    content = content.replace(/src="data:image\/[^;]+;base64,[^"]{10240,}"/g, 'src="" data-cached-image="stripped"');
+  }
+
+  const sanitizedLinks = msg.externalLinks?.map((link) => {
+    if (link.url && link.url.startsWith("data:") && link.url.length > 10240) {
+      return {
+        ...link,
+        url: "",
+      };
+    }
+    return link;
+  });
+
+  return {
+    ...msg,
+    contentHtml: content,
+    externalLinks: sanitizedLinks,
+  };
 }
 
 export function loadLocalMessages(): QuoteMessage[] {
@@ -429,9 +500,19 @@ export function loadLocalMessages(): QuoteMessage[] {
 
 export function saveLocalMessages(messages: QuoteMessage[]) {
   try {
-    localStorage.setItem(STORAGE_KEY_MESSAGES, JSON.stringify(messages));
+    // 1. Keep only the most recent 80 messages for offline/initial boot cache
+    const recentMessages = messages.slice(-80);
+    // 2. Strip large base64 attachments from local cache (Firestore retains the full originals)
+    const sanitized = recentMessages.map(sanitizeMessageForLocalCache);
+    
+    const success = safeSetLocalStorage(STORAGE_KEY_MESSAGES, JSON.stringify(sanitized));
+    if (!success && sanitized.length > 25) {
+      // If quota still exceeded, trim to latest 25 messages
+      const emergencyTrimmed = sanitized.slice(-25);
+      safeSetLocalStorage(STORAGE_KEY_MESSAGES, JSON.stringify(emergencyTrimmed));
+    }
   } catch (e) {
-    console.error("Failed to save local messages:", e);
+    console.warn("Could not save messages to localStorage:", e);
   }
 }
 
@@ -466,8 +547,6 @@ export const INITIAL_SAMPLE_CHAT_MESSAGES: ChatMessage[] = [
   },
 ];
 
-const STORAGE_KEY_CHAT_MESSAGES = "marine_chat_messages_data_v1";
-
 export function loadLocalChatMessages(): ChatMessage[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY_CHAT_MESSAGES);
@@ -481,9 +560,13 @@ export function loadLocalChatMessages(): ChatMessage[] {
 
 export function saveLocalChatMessages(messages: ChatMessage[]) {
   try {
-    localStorage.setItem(STORAGE_KEY_CHAT_MESSAGES, JSON.stringify(messages));
+    const recent = messages.slice(-60);
+    const success = safeSetLocalStorage(STORAGE_KEY_CHAT_MESSAGES, JSON.stringify(recent));
+    if (!success && recent.length > 20) {
+      safeSetLocalStorage(STORAGE_KEY_CHAT_MESSAGES, JSON.stringify(recent.slice(-20)));
+    }
   } catch (e) {
-    console.error("Failed to save local chat messages:", e);
+    console.warn("Could not save chat messages to localStorage:", e);
   }
 }
 

@@ -120,9 +120,9 @@ export function markEventAsNotified(id: string) {
     if (notifiedSet.has(id)) return;
     notifiedSet.add(id);
     const arr = Array.from(notifiedSet);
-    // Keep set bounded to last 1000 items to avoid excessive storage growth
-    if (arr.length > 1000) {
-      arr.splice(0, arr.length - 1000);
+    // Keep set bounded to last 300 items to avoid excessive storage growth
+    if (arr.length > 300) {
+      arr.splice(0, arr.length - 300);
     }
     localStorage.setItem(NOTIFIED_IDS_KEY, JSON.stringify(arr));
   } catch (e) {

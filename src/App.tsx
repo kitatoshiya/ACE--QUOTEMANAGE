@@ -1537,6 +1537,7 @@ export default function App() {
         onClose={() => setIsNewQuoteOpen(false)}
         currentUser={currentUser}
         staffMembers={staffMembers}
+        quotes={quotes}
         onCreateQuote={handleCreateQuote}
       />
 

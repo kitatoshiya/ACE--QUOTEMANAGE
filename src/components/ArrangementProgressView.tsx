@@ -140,6 +140,39 @@ export const ArrangementProgressView: React.FC<ArrangementProgressViewProps> = (
     onUpdateQuote(updatedQuote);
   };
 
+  // Toggle all tasks completion (Bulk Complete All at once)
+  const handleCompleteAllTasks = (quote: QuotationItem, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const currentTasks = quote.arrangementTasks || {};
+    const completedCount = ARRANGEMENT_TASKS.filter((t) => currentTasks[t.id]?.completed).length;
+    const isAllDone = completedCount === 7;
+    const targetCompleted = !isAllDone;
+
+    const updatedTasks: Record<number, ArrangementTaskStatus> = {};
+    const nowStr = new Date().toISOString();
+
+    ARRANGEMENT_TASKS.forEach((t) => {
+      const prevStatus = currentTasks[t.id];
+      updatedTasks[t.id] = {
+        completed: targetCompleted,
+        ...(targetCompleted
+          ? { completedAt: prevStatus?.completedAt || nowStr, completedBy: prevStatus?.completedBy || currentUser.name }
+          : {}),
+        ...(prevStatus?.note ? { note: prevStatus.note } : {}),
+      };
+    });
+
+    const updatedQuote: QuotationItem = {
+      ...quote,
+      arrangementTasks: updatedTasks,
+      isArrangementCompleted: targetCompleted,
+      updatedAt: new Date().toISOString(),
+      updatedBy: currentUser.email,
+    };
+
+    onUpdateQuote(updatedQuote);
+  };
+
   // Filter quotes based on search and filters
   const filteredAcceptedQuotes = useMemo(() => {
     return acceptedQuotes.filter((quote) => {
@@ -638,18 +671,33 @@ export const ArrangementProgressView: React.FC<ArrangementProgressViewProps> = (
                               <span className="text-[10px] font-bold text-slate-400">
                                 手配工程: <strong className="text-cyan-400">{completedTasksCount}/7 完了</strong>
                               </span>
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setEditingQuote(quote);
-                                }}
-                                className="text-[10px] text-sky-400 hover:text-sky-300 flex items-center gap-0.5 font-bold"
-                                title="手配情報・日程・タスクの編集"
-                              >
-                                <Edit3 className="w-2.5 h-2.5" />
-                                編集
-                              </button>
+                              <div className="flex items-center gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={(e) => handleCompleteAllTasks(quote, e)}
+                                  className={`text-[10px] flex items-center gap-0.5 font-bold px-1.5 py-0.5 rounded transition-all active:scale-95 border ${
+                                    completedTasksCount === 7
+                                      ? "bg-emerald-950/80 text-emerald-300 border-emerald-600/80 hover:bg-emerald-900/80"
+                                      : "bg-emerald-950/60 hover:bg-emerald-900/80 text-emerald-400 border border-emerald-500/50"
+                                  }`}
+                                  title={completedTasksCount === 7 ? "全7ステップを一括解除" : "全7ステップを一括で完了にする"}
+                                >
+                                  <CheckCircle2 className="w-2.5 h-2.5 text-emerald-400 shrink-0" />
+                                  <span>{completedTasksCount === 7 ? "全完了済" : "一括完了"}</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setEditingQuote(quote);
+                                  }}
+                                  className="text-[10px] text-sky-400 hover:text-sky-300 flex items-center gap-0.5 font-bold"
+                                  title="手配情報・日程・タスクの編集"
+                                >
+                                  <Edit3 className="w-2.5 h-2.5" />
+                                  編集
+                                </button>
+                              </div>
                             </div>
 
                             {/* Stepper Dots Row 1..7 */}
@@ -844,9 +892,42 @@ export const ArrangementProgressView: React.FC<ArrangementProgressViewProps> = (
 
               {/* 7 Tasks Checkbox Matrix */}
               <div>
-                <label className="text-xs font-bold text-slate-300 block mb-2">
-                  7つの手配ステップチェック
-                </label>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="text-xs font-bold text-slate-300">
+                    7つの手配ステップチェック
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const currentTasks = editingQuote.arrangementTasks || {};
+                      const completedCount = ARRANGEMENT_TASKS.filter((t) => currentTasks[t.id]?.completed).length;
+                      const targetCompleted = completedCount !== 7;
+                      const updatedTasks: Record<number, ArrangementTaskStatus> = {};
+                      const nowStr = new Date().toISOString();
+
+                      ARRANGEMENT_TASKS.forEach((t) => {
+                        const prevStatus = currentTasks[t.id];
+                        updatedTasks[t.id] = {
+                          completed: targetCompleted,
+                          ...(targetCompleted
+                            ? { completedAt: prevStatus?.completedAt || nowStr, completedBy: prevStatus?.completedBy || currentUser.name }
+                            : {}),
+                          ...(prevStatus?.note ? { note: prevStatus.note } : {}),
+                        };
+                      });
+
+                      setEditingQuote({
+                        ...editingQuote,
+                        arrangementTasks: updatedTasks,
+                        isArrangementCompleted: targetCompleted,
+                      });
+                    }}
+                    className="text-[11px] px-2 py-0.5 rounded bg-emerald-950/80 hover:bg-emerald-900 text-emerald-300 border border-emerald-700 flex items-center gap-1 font-bold transition-all"
+                  >
+                    <CheckCircle2 className="w-3 h-3 text-emerald-400 shrink-0" />
+                    <span>一括完了</span>
+                  </button>
+                </div>
                 <div className="space-y-1.5 bg-slate-950 p-3 rounded-xl border border-slate-800 max-h-48 overflow-y-auto custom-scrollbar">
                   {ARRANGEMENT_TASKS.map((task) => {
                     const tasks = editingQuote.arrangementTasks || {};

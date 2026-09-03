@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import {
   X,
   Ship,
@@ -22,6 +22,7 @@ interface NewQuoteModalProps {
   onClose: () => void;
   currentUser: UserProfile;
   staffMembers: StaffMember[];
+  quotes?: QuotationItem[];
   onCreateQuote: (
     newQuote: Omit<QuotationItem, "id" | "createdAt" | "updatedAt" | "lastRepliedAt" | "readBy">,
     initialMessageHtml: string
@@ -34,6 +35,7 @@ export const NewQuoteModal: React.FC<NewQuoteModalProps> = ({
   onClose,
   currentUser,
   staffMembers,
+  quotes = [],
   onCreateQuote,
   initialStatus = "requested",
 }) => {
@@ -51,8 +53,6 @@ export const NewQuoteModal: React.FC<NewQuoteModalProps> = ({
   const [linkTitleInput, setLinkTitleInput] = useState("");
   const [linkUrlInput, setLinkUrlInput] = useState("");
 
-  if (!isOpen) return null;
-
   // Validate airport codes format
   const getParsedAirportCodes = () => {
     if (!airportCodesInput) return [];
@@ -64,6 +64,70 @@ export const NewQuoteModal: React.FC<NewQuoteModalProps> = ({
 
   const parsedAirports = getParsedAirportCodes();
   const invalidAirports = parsedAirports.filter((c) => !isValidIataCode(c));
+
+  // Compute top destinations from past 1 month quotes
+  const recentDestinations = useMemo(() => {
+    const oneMonthAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
+    const countMap: Record<string, number> = {};
+    let recentCount = 0;
+
+    // 1. Count airport codes in quotes created within past 30 days
+    quotes.forEach((q) => {
+      const time = q.createdAt ? new Date(q.createdAt).getTime() : 0;
+      if (time >= oneMonthAgo && Array.isArray(q.airportCodes)) {
+        q.airportCodes.forEach((code) => {
+          const clean = code?.trim().toUpperCase();
+          if (clean && isValidIataCode(clean)) {
+            countMap[clean] = (countMap[clean] || 0) + 1;
+            recentCount++;
+          }
+        });
+      }
+    });
+
+    // If no recent quotes found (e.g. initial demo/test state), fallback to all-time quotes
+    if (recentCount === 0 && quotes.length > 0) {
+      quotes.forEach((q) => {
+        if (Array.isArray(q.airportCodes)) {
+          q.airportCodes.forEach((code) => {
+            const clean = code?.trim().toUpperCase();
+            if (clean && isValidIataCode(clean)) {
+              countMap[clean] = (countMap[clean] || 0) + 1;
+            }
+          });
+        }
+      });
+    }
+
+    // Always ensure major maritime hub airports are present
+    const standardHubs = ["SIN", "BKK", "HKG", "RTM", "DXB", "HND", "KIX"];
+    standardHubs.forEach((hub) => {
+      if (countMap[hub] === undefined) {
+        countMap[hub] = 0;
+      }
+    });
+
+    return Object.entries(countMap)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 8)
+      .map(([code]) => ({ code }));
+  }, [quotes]);
+
+  // Handle clicking on destination tag (toggle or set)
+  const handleToggleAirportTag = (code: string) => {
+    const current = getParsedAirportCodes();
+    if (current.includes(code)) {
+      // If already present, remove it
+      const next = current.filter((c) => c !== code);
+      setAirportCodesInput(next.join(", "));
+    } else {
+      // If not present, add it (or set if empty)
+      const next = [...current, code];
+      setAirportCodesInput(next.join(", "));
+    }
+  };
+
+  if (!isOpen) return null;
 
   // Add external link
   const handleAddLink = () => {
@@ -211,6 +275,35 @@ export const NewQuoteModal: React.FC<NewQuoteModalProps> = ({
                   <p className="mt-1 text-[10px] text-amber-400 font-medium">
                     ⚠️ 英大文字3桁で入力してください。
                   </p>
+                )}
+
+                {/* Past 1 Month Destination Tags (3-letter codes only, single horizontal row) */}
+                {recentDestinations.length > 0 && (
+                  <div className="mt-1 flex items-center gap-1 overflow-x-auto no-scrollbar py-0.5">
+                    <span className="text-[10px] text-slate-400 font-semibold shrink-0 select-none">
+                      実績:
+                    </span>
+                    <div className="flex items-center gap-1 shrink-0 flex-nowrap">
+                      {recentDestinations.map(({ code }) => {
+                        const isSelected = parsedAirports.includes(code);
+                        return (
+                          <button
+                            key={code}
+                            type="button"
+                            onClick={() => handleToggleAirportTag(code)}
+                            className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-bold transition-all active:scale-95 cursor-pointer shrink-0 leading-tight ${
+                              isSelected
+                                ? "bg-sky-500 text-white shadow-xs ring-1 ring-sky-300"
+                                : "bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700/80 hover:border-slate-600"
+                            }`}
+                            title={`${code} - クリックで反映 / 解除`}
+                          >
+                            {code}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
                 )}
               </div>
 
