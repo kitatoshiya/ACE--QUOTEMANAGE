@@ -1,6 +1,8 @@
 import React, { useState, useRef, useMemo, useEffect } from "react";
 import * as XLSX from "xlsx";
 import ExcelJS from "exceljs";
+import { doc, getDoc, setDoc } from "firebase/firestore";
+import { db } from "../lib/firebase";
 import {
   FileSpreadsheet,
   Upload,
@@ -111,9 +113,26 @@ export const StockExtractorView: React.FC<StockExtractorViewProps> = ({
     return `${day} ${monthStr} ${year}`;
   };
 
-  // Mail Compose Modal States (Default values per user request)
+  // Helper to get normalized current user storage key
+  const getUserKey = (email?: string | null) => {
+    return (email || currentUser?.email || "default_user").toLowerCase().trim();
+  };
+
+  // Mail Compose Modal States (Default values per user request, persisted per user)
   const [isMailModalOpen, setIsMailModalOpen] = useState<boolean>(false);
-  const [mailClient, setMailClient] = useState<"mailto" | "gmail" | "outlook">("gmail");
+  const [mailClient, setMailClient] = useState<"mailto" | "gmail" | "outlook">(() => {
+    const userKey = getUserKey();
+    try {
+      const saved = localStorage.getItem(`stock_extractor_mail_client_${userKey}`);
+      if (saved === "mailto" || saved === "gmail" || saved === "outlook") {
+        return saved;
+      }
+    } catch (e) {
+      console.warn("Error reading local mail client:", e);
+    }
+    return "gmail";
+  });
+  const [isSavedToastShown, setIsSavedToastShown] = useState<boolean>(false);
   const [mailTo, setMailTo] = useState<string>("operations@acetrans.gr");
   const [mailCc, setMailCc] = useState<string>("JAPAN@acetrans.gr");
   const [mailFrom, setMailFrom] = useState<string>(currentUser?.email || "kita@kit-agent.net");
@@ -133,12 +152,78 @@ osaeig1@tac-japan.co.jp
   const [bodyFontSize, setBodyFontSize] = useState<number>(14);
   const [copiedType, setCopiedType] = useState<"subject" | "body" | "all" | null>(null);
 
-  // Sync sender email if currentUser prop changes
+  // Sync sender email and load user-specific mail client preference when currentUser changes
   useEffect(() => {
     if (currentUser?.email) {
       setMailFrom(currentUser.email);
+      const userKey = getUserKey(currentUser.email);
+
+      // 1. Restore from localStorage for fast initial response
+      try {
+        const saved = localStorage.getItem(`stock_extractor_mail_client_${userKey}`);
+        if (saved === "mailto" || saved === "gmail" || saved === "outlook") {
+          setMailClient(saved);
+        }
+      } catch (e) {
+        console.warn("Error reading local mail client:", e);
+      }
+
+      // 2. Fetch from Firestore for cross-device synchronization
+      if (db) {
+        getDoc(doc(db, "user_mail_prefs", userKey))
+          .then((docSnap) => {
+            if (docSnap.exists()) {
+              const data = docSnap.data();
+              if (data?.stockExtractorMailClient) {
+                const client = data.stockExtractorMailClient;
+                if (client === "mailto" || client === "gmail" || client === "outlook") {
+                  setMailClient(client);
+                  localStorage.setItem(`stock_extractor_mail_client_${userKey}`, client);
+                }
+              }
+            }
+          })
+          .catch((err) => {
+            console.warn("Failed to load user mail prefs from Firestore:", err);
+          });
+      }
     }
   }, [currentUser?.email]);
+
+  // Handler to select and persist mail client preference per logged-in user
+  const handleSelectMailClient = (client: "mailto" | "gmail" | "outlook") => {
+    setMailClient(client);
+    const userKey = getUserKey();
+
+    // Persist to localStorage
+    try {
+      localStorage.setItem(`stock_extractor_mail_client_${userKey}`, client);
+    } catch (e) {
+      console.warn("Failed to save mail client to localStorage:", e);
+    }
+
+    // Persist to Firestore
+    if (db && currentUser?.email) {
+      setDoc(
+        doc(db, "user_mail_prefs", userKey),
+        {
+          stockExtractorMailClient: client,
+          userEmail: currentUser.email,
+          userName: currentUser.name || "",
+          updatedAt: new Date().toISOString(),
+        },
+        { merge: true }
+      ).catch((err) => {
+        console.warn("Failed to persist user mail prefs to Firestore:", err);
+      });
+    }
+
+    // Show brief saved feedback
+    setIsSavedToastShown(true);
+    setTimeout(() => {
+      setIsSavedToastShown(false);
+    }, 2000);
+  };
 
   // Mail Compose Handlers
   const handleCopyText = (text: string, type: "subject" | "body" | "all") => {
@@ -165,15 +250,42 @@ osaeig1@tac-japan.co.jp
     const body = encodeURIComponent(mailBody);
 
     if (mailClient === "gmail") {
+      // Web版 Gmail 作成画面を別タブで開く
       const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${to}&cc=${cc}&su=${subject}&body=${body}`;
       window.open(gmailUrl, "_blank", "noopener,noreferrer");
     } else if (mailClient === "outlook") {
-      const outlookUrl = `https://outlook.office.com/mail/deeplink/compose?to=${to}&cc=${cc}&subject=${subject}&body=${body}`;
-      window.open(outlookUrl, "_blank", "noopener,noreferrer");
+      // アプリの Outlook（PC/OSにインストールされているデスクトップアプリ）を起動
+      // mailto: スキームにより、OSの既定メールアプリ（Outlook）が直接起動し、
+      // 宛先・CC・件名・本文が自動挿入された新規メッセージ作成ウィンドウが開きます
+      const mailtoUrl = `mailto:${mailTo.trim()}?cc=${cc}&subject=${subject}&body=${body}`;
+      const tempLink = document.createElement("a");
+      tempLink.href = mailtoUrl;
+      document.body.appendChild(tempLink);
+      tempLink.click();
+      document.body.removeChild(tempLink);
     } else {
-      const mailtoUrl = `mailto:${mailTo.trim()}?cc=${encodeURIComponent(mailCc.trim())}&subject=${subject}&body=${body}`;
-      window.location.href = mailtoUrl;
+      // 標準アプリ (mailto)
+      const mailtoUrl = `mailto:${mailTo.trim()}?cc=${cc}&subject=${subject}&body=${body}`;
+      const tempLink = document.createElement("a");
+      tempLink.href = mailtoUrl;
+      document.body.appendChild(tempLink);
+      tempLink.click();
+      document.body.removeChild(tempLink);
     }
+  };
+
+  // Optional: New Outlook URI scheme launcher for users with New Outlook protocol
+  const handleLaunchMsOutlookDirect = () => {
+    const to = encodeURIComponent(mailTo.trim());
+    const cc = encodeURIComponent(mailCc.trim());
+    const subject = encodeURIComponent(mailSubject.trim());
+    const body = encodeURIComponent(mailBody);
+    const msOutlookUrl = `ms-outlook://compose?to=${to}&cc=${cc}&subject=${subject}&body=${body}`;
+    const tempLink = document.createElement("a");
+    tempLink.href = msOutlookUrl;
+    document.body.appendChild(tempLink);
+    tempLink.click();
+    document.body.removeChild(tempLink);
   };
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -1611,15 +1723,28 @@ osaeig1@tac-japan.co.jp
             {/* Modal Content Scrollable Area */}
             <div className="p-6 overflow-y-auto space-y-4 text-xs">
               {/* Email Client Selector (Personal Settings) */}
-              <div className="bg-slate-100/80 border border-slate-200 p-3 rounded-xl flex items-center justify-between gap-2 flex-wrap">
-                <div className="flex items-center gap-1.5 text-slate-700 font-bold">
-                  <Settings2 className="w-4 h-4 text-blue-600" />
-                  <span>起動メールソフト (個人設定):</span>
+              <div className="bg-slate-100/90 border border-slate-200 p-3 rounded-xl flex items-center justify-between gap-2 flex-wrap">
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1.5 text-slate-700 font-bold">
+                    <Settings2 className="w-4 h-4 text-blue-600" />
+                    <span>起動メールソフト (個人設定):</span>
+                  </div>
+                  {currentUser?.email && (
+                    <span className="text-[10px] text-slate-500 bg-white border border-slate-200 px-2 py-0.5 rounded-full font-mono">
+                      {currentUser.name || currentUser.email}
+                    </span>
+                  )}
+                  {isSavedToastShown && (
+                    <span className="text-[10px] text-emerald-700 bg-emerald-100 border border-emerald-300 px-2 py-0.5 rounded-full font-bold flex items-center gap-1 animate-in fade-in">
+                      <Check className="w-3 h-3" />
+                      個人設定を保存しました
+                    </span>
+                  )}
                 </div>
                 <div className="inline-flex rounded-lg bg-slate-200 p-0.5 border border-slate-300">
                   <button
                     type="button"
-                    onClick={() => setMailClient("mailto")}
+                    onClick={() => handleSelectMailClient("mailto")}
                     className={`px-3 py-1 text-xs font-bold rounded-md transition-all cursor-pointer ${
                       mailClient === "mailto"
                         ? "bg-white text-slate-900 shadow-xs"
@@ -1630,7 +1755,7 @@ osaeig1@tac-japan.co.jp
                   </button>
                   <button
                     type="button"
-                    onClick={() => setMailClient("gmail")}
+                    onClick={() => handleSelectMailClient("gmail")}
                     className={`px-3 py-1 text-xs font-bold rounded-md transition-all cursor-pointer ${
                       mailClient === "gmail"
                         ? "bg-red-600 text-white shadow-xs"
@@ -1641,7 +1766,7 @@ osaeig1@tac-japan.co.jp
                   </button>
                   <button
                     type="button"
-                    onClick={() => setMailClient("outlook")}
+                    onClick={() => handleSelectMailClient("outlook")}
                     className={`px-3 py-1 text-xs font-bold rounded-md transition-all cursor-pointer ${
                       mailClient === "outlook"
                         ? "bg-blue-600 text-white shadow-xs"
@@ -1652,6 +1777,23 @@ osaeig1@tac-japan.co.jp
                   </button>
                 </div>
               </div>
+
+              {mailClient === "outlook" && (
+                <div className="bg-blue-50/70 border border-blue-200 rounded-lg px-3 py-2 text-[11px] text-blue-900 flex items-center justify-between gap-2 flex-wrap">
+                  <div className="flex items-center gap-1.5">
+                    <Info className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                    <span>PCにインストールされている<strong>Outlookデスクトップアプリ</strong>を直接起動します（宛先・CC・件名・本文が自動挿入されます）。</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleLaunchMsOutlookDirect}
+                    className="text-[10px] text-blue-600 hover:text-blue-800 underline font-bold cursor-pointer"
+                    title="Windows New Outlook専用URIスキームで開く"
+                  >
+                    New Outlook専用リンクで起動
+                  </button>
+                </div>
+              )}
 
               {/* Sender (From) */}
               <div>
@@ -1832,7 +1974,7 @@ osaeig1@tac-japan.co.jp
                     {mailClient === "gmail"
                       ? "Gmailで開く"
                       : mailClient === "outlook"
-                      ? "Outlookで開く"
+                      ? "Outlookアプリを起動"
                       : "メールソフトを起動"}
                   </span>
                 </button>
