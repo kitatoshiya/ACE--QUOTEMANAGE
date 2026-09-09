@@ -1795,9 +1795,19 @@ export const SharedMailboxView: React.FC<SharedMailboxViewProps> = ({
                     className={`max-w-none text-xs sm:text-sm shared-mail-body ${
                       currentTheme === "light"
                         ? "text-slate-950 bg-white"
-                        : "prose dark:prose-invert text-slate-200"
+                        : "shared-mail-body-dark text-slate-100"
                     }`}
-                    dangerouslySetInnerHTML={{ __html: selectedMessage.bodyHtml }}
+                    dangerouslySetInnerHTML={{
+                      __html: currentTheme === "light"
+                        ? selectedMessage.bodyHtml
+                        : selectedMessage.bodyHtml
+                            .replace(/bgcolor\s*=\s*["'][^"']*["']/gi, '')
+                            .replace(/bgcolor\s*=\s*#?[a-f0-9]+/gi, '')
+                            .replace(/background-color\s*:\s*[^;"]+/gi, 'background-color: transparent')
+                            .replace(/background\s*:\s*(#ffffff|#fff|white|#f[0-9a-f]{5}|rgb\([^)]+\))/gi, 'background: transparent')
+                            .replace(/color\s*:\s*(#000000|#000|black|#111111|#111|#222222|#222|#333333|#333|#444444|#444|#555555|#555|#666666|#666|#777777|#777|#888888|#888|windowtext|rgb\(\s*0\s*,\s*0\s*,\s*0\s*\)|rgb\(\s*34\s*,\s*34\s*,\s*34\s*\)|rgb\(\s*51\s*,\s*51\s*,\s*51\s*\))/gi, 'color: #f8fafc !important')
+                            .replace(/color="(#000000|#000|black|#111111|#111|#222222|#222|#333333|#333|#444444|#444|#555555|#555|#666666|#666|#777777|#777|#888888|#888|windowtext)"/gi, 'color="#f8fafc"')
+                    }}
                   />
                 ) : (
                   <pre className={`whitespace-pre-wrap font-sans text-xs sm:text-sm ${

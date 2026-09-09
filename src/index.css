@@ -540,6 +540,106 @@ textarea.rich-editor-input {
   line-height: 1.6;
 }
 
+/* Non-Light Mode Email Body Table & Background Matching Rules (Dark, Kawaii/Cute, Digital) */
+.shared-mail-body-dark table,
+.shared-mail-body-dark table *,
+.shared-mail-body-dark tbody,
+.shared-mail-body-dark thead,
+.shared-mail-body-dark tfoot,
+.shared-mail-body-dark tr,
+.shared-mail-body-dark td,
+.shared-mail-body-dark th,
+.theme-dark .shared-mail-body table,
+.theme-dark .shared-mail-body table *,
+.theme-dark .shared-mail-body tbody,
+.theme-dark .shared-mail-body thead,
+.theme-dark .shared-mail-body tfoot,
+.theme-dark .shared-mail-body tr,
+.theme-dark .shared-mail-body td,
+.theme-dark .shared-mail-body th,
+.dark .shared-mail-body table,
+.dark .shared-mail-body table *,
+.dark .shared-mail-body tbody,
+.dark .shared-mail-body thead,
+.dark .shared-mail-body tfoot,
+.dark .shared-mail-body tr,
+.dark .shared-mail-body td,
+.dark .shared-mail-body th,
+.theme-cute .shared-mail-body table,
+.theme-cute .shared-mail-body table *,
+.theme-cute .shared-mail-body tbody,
+.theme-cute .shared-mail-body thead,
+.theme-cute .shared-mail-body tfoot,
+.theme-cute .shared-mail-body tr,
+.theme-cute .shared-mail-body td,
+.theme-cute .shared-mail-body th,
+.theme-digital .shared-mail-body table,
+.theme-digital .shared-mail-body table *,
+.theme-digital .shared-mail-body tbody,
+.theme-digital .shared-mail-body thead,
+.theme-digital .shared-mail-body tfoot,
+.theme-digital .shared-mail-body tr,
+.theme-digital .shared-mail-body td,
+.theme-digital .shared-mail-body th {
+  background-color: transparent !important;
+  background: transparent !important;
+}
+
+/* Clear white background colors inside non-light theme email bodies */
+.shared-mail-body-dark [style*="background"],
+.theme-dark .shared-mail-body [style*="background"],
+.dark .shared-mail-body [style*="background"],
+.theme-cute .shared-mail-body [style*="background"],
+.theme-digital .shared-mail-body [style*="background"],
+.shared-mail-body-dark [bgcolor],
+.theme-dark .shared-mail-body [bgcolor],
+.dark .shared-mail-body [bgcolor],
+.theme-cute .shared-mail-body [bgcolor],
+.theme-digital .shared-mail-body [bgcolor] {
+  background-color: transparent !important;
+  background: transparent !important;
+}
+
+/* Non-Light Mode Email Text Color Rules (White/Light Text for Dark, Kawaii/Cute, Digital Themes) */
+.shared-mail-body-dark,
+.shared-mail-body-dark *,
+.theme-dark .shared-mail-body,
+.theme-dark .shared-mail-body *,
+.dark .shared-mail-body,
+.dark .shared-mail-body *,
+.theme-cute .shared-mail-body,
+.theme-cute .shared-mail-body *,
+.theme-digital .shared-mail-body,
+.theme-digital .shared-mail-body * {
+  color: #f8fafc !important;
+}
+
+/* Links in non-light mode email body */
+.shared-mail-body-dark a,
+.shared-mail-body-dark a *,
+.theme-dark .shared-mail-body a,
+.theme-dark .shared-mail-body a *,
+.dark .shared-mail-body a,
+.dark .shared-mail-body a *,
+.theme-cute .shared-mail-body a,
+.theme-cute .shared-mail-body a *,
+.theme-digital .shared-mail-body a,
+.theme-digital .shared-mail-body a * {
+  color: #38bdf8 !important;
+  text-decoration: underline;
+}
+
+/* Email Quote Headers & Quote Lines */
+.shared-mail-body-dark blockquote,
+.theme-dark .shared-mail-body blockquote,
+.dark .shared-mail-body blockquote,
+.theme-cute .shared-mail-body blockquote,
+.theme-digital .shared-mail-body blockquote {
+  border-left-color: #38bdf8 !important;
+  background-color: transparent !important;
+  color: #e2e8f0 !important;
+}
+
 
 
 
