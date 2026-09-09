@@ -1,5 +1,5 @@
-import handler from "./[...all]";
+import app from "../server";
 
-export default handler;
+export default app;
 
 

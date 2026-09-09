@@ -16,6 +16,16 @@ app.use((req, res, next) => {
   if (req.method === "OPTIONS") {
     return res.status(200).end();
   }
+
+  // Restore original request URL if rewritten by Vercel proxy
+  const forwardedUri = req.headers["x-forwarded-uri"] as string;
+  const originalUrl = req.headers["x-original-url"] as string;
+  if (forwardedUri && forwardedUri.startsWith("/api")) {
+    req.url = forwardedUri;
+  } else if (originalUrl && originalUrl.startsWith("/api")) {
+    req.url = originalUrl;
+  }
+
   next();
 });
 
