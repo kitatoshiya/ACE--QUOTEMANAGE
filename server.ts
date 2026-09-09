@@ -1290,6 +1290,25 @@ app.post("/api/shared-mail/send", async (req, res) => {
   });
 });
 
+// Express API 404 Fallback Handler for unmatched API routes
+app.use("/api/*", (req, res) => {
+  res.status(404).json({
+    error: "API Endpoint Not Found",
+    path: req.originalUrl || req.url,
+  });
+});
+
+// Global Express Error Handler
+app.use((err: any, req: any, res: any, next: any) => {
+  console.error("[Express Global Error]:", err);
+  if (!res.headersSent) {
+    res.status(500).json({
+      error: "Internal Server Error",
+      message: err?.message || String(err),
+    });
+  }
+});
+
 // Start Server with Vite Middleware in dev or static serve in prod
 async function startServer() {
   if (process.env.VERCEL) {
