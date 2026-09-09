@@ -17,13 +17,15 @@ app.use((req, res, next) => {
     return res.status(200).end();
   }
 
-  // Restore original request URL if rewritten by Vercel proxy
+  // Restore original request URL and ensure /api prefix for Express routing
   const forwardedUri = req.headers["x-forwarded-uri"] as string;
   const originalUrl = req.headers["x-original-url"] as string;
   if (forwardedUri && forwardedUri.startsWith("/api")) {
     req.url = forwardedUri;
   } else if (originalUrl && originalUrl.startsWith("/api")) {
     req.url = originalUrl;
+  } else if (!req.url.startsWith("/api")) {
+    req.url = "/api" + (req.url.startsWith("/") ? "" : "/") + req.url;
   }
 
   next();
