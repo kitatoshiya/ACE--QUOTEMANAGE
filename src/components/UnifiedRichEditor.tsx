@@ -29,6 +29,15 @@ export const UnifiedRichEditor: React.FC<UnifiedRichEditorProps> = ({
   const [mentionQuery, setMentionQuery] = useState("");
   const [selectedCandidateIdx, setSelectedCandidateIdx] = useState(0);
 
+  // Synchronize external value changes (such as modal open with prefilled mail HTML) to contentEditable div
+  useEffect(() => {
+    if (editorRef.current && !isRawSourceMode) {
+      if (editorRef.current.innerHTML !== (value || "")) {
+        editorRef.current.innerHTML = value || "";
+      }
+    }
+  }, [value, isRawSourceMode]);
+
   const filteredCandidates = React.useMemo(() => {
     if (!staffMembers || staffMembers.length === 0) return [];
     if (!mentionQuery) return staffMembers;

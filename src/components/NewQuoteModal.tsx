@@ -28,6 +28,13 @@ interface NewQuoteModalProps {
     initialMessageHtml: string
   ) => void;
   initialStatus?: QuoteStatus;
+  initialDraft?: {
+    title?: string;
+    vesselName?: string;
+    airportCodes?: string[];
+    notes?: string;
+    htmlBody?: string;
+  };
 }
 
 export const NewQuoteModal: React.FC<NewQuoteModalProps> = ({
@@ -38,6 +45,7 @@ export const NewQuoteModal: React.FC<NewQuoteModalProps> = ({
   quotes = [],
   onCreateQuote,
   initialStatus = "requested",
+  initialDraft,
 }) => {
   // Form states
   const [title, setTitle] = useState("");
@@ -52,6 +60,60 @@ export const NewQuoteModal: React.FC<NewQuoteModalProps> = ({
   const [externalLinks, setExternalLinks] = useState<ExternalLink[]>([]);
   const [linkTitleInput, setLinkTitleInput] = useState("");
   const [linkUrlInput, setLinkUrlInput] = useState("");
+
+  // Sync initial draft if opened with pre-filled content (e.g. from Shared Mailbox)
+  React.useEffect(() => {
+    if (isOpen) {
+      if (initialDraft) {
+        if (initialDraft.title) setTitle(initialDraft.title);
+        if (initialDraft.vesselName) setVesselName(initialDraft.vesselName);
+        if (initialDraft.airportCodes && initialDraft.airportCodes.length > 0) {
+          setAirportCodesInput(initialDraft.airportCodes.join(", "));
+        }
+        const draftContent = initialDraft.htmlBody || initialDraft.notes || "";
+        if (draftContent) {
+          const trimmed = draftContent.trim();
+          const isHtml =
+            trimmed.startsWith("<") &&
+            (trimmed.includes("</") ||
+              trimmed.includes("/>") ||
+              trimmed.includes("<br") ||
+              trimmed.includes("<table") ||
+              trimmed.includes("<img") ||
+              trimmed.includes("<div") ||
+              trimmed.includes("<p"));
+
+          if (isHtml) {
+            // HTMLメール本文はそのままリッチHTML（表・罫線・画像・装飾）として渡す
+            setMessageContent(draftContent);
+          } else {
+            // プレーンテキストの場合は改行を整形
+            const htmlFormatted = draftContent
+              .replace(/&/g, "&amp;")
+              .replace(/</g, "&lt;")
+              .replace(/>/g, "&gt;")
+              .replace(/\r\n/g, "<br/>")
+              .replace(/\n/g, "<br/>");
+            setMessageContent(`<p class="my-1 leading-relaxed">${htmlFormatted}</p>`);
+          }
+        }
+      }
+    } else {
+      // 閉じた際にフォームをリセット
+      setTitle("");
+      setVesselName("");
+      setAirportCodesInput("");
+      setWeightBreak("");
+      setCustomsClearanceDate("");
+      setIsUrgent(false);
+      setStatus(initialStatus);
+      setAssignedStaffId("");
+      setMessageContent("");
+      setExternalLinks([]);
+      setLinkTitleInput("");
+      setLinkUrlInput("");
+    }
+  }, [isOpen, initialDraft, initialStatus]);
 
   // Validate airport codes format
   const getParsedAirportCodes = () => {

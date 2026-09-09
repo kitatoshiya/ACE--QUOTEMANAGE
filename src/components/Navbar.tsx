@@ -27,6 +27,7 @@ import {
   SlidersHorizontal,
   Calendar,
   FileSpreadsheet,
+  Mail,
 } from "lucide-react";
 import { ActiveView, AppTheme, FilterOptions, QuotationItem, QuoteMessage, StaffMember, UserProfile } from "../types";
 import { POPULAR_IATA_AIRPORTS } from "../lib/iataAirports";
@@ -204,6 +205,18 @@ export const Navbar: React.FC<NavbarProps> = ({
             >
               <FileSpreadsheet className="w-3 h-3 text-emerald-400" />
               <span>在庫抽出</span>
+            </button>
+            <button
+              onClick={() => onActiveViewChange("shared_mail")}
+              className={`flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-bold transition-all ${
+                activeView === "shared_mail"
+                  ? "bg-gradient-to-r from-blue-600 via-sky-600 to-indigo-600 text-white shadow-sm ring-1 ring-sky-400/40"
+                  : "text-slate-400 hover:text-sky-400 hover:bg-slate-800/60"
+              }`}
+              title="共通メールボックス (Microsoft 365)"
+            >
+              <Mail className="w-3 h-3 text-sky-400" />
+              <span>共通メール</span>
             </button>
             <button
               onClick={() => onActiveViewChange("sticky_board")}

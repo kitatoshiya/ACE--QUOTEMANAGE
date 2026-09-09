@@ -313,3 +313,233 @@ textarea.rich-editor-input {
   }
 }
 
+/* ==========================================================
+   Shared Mailbox Light Mode Typography & Color Contrast Rules
+   Ensures text is never faint, gray, or white on light backgrounds
+   ========================================================== */
+.theme-light .shared-mail-wrapper {
+  color: #0f172a !important;
+  background-color: #f8fafc !important;
+}
+
+.theme-light .shared-mail-sidebar {
+  background-color: #ffffff !important;
+  border-color: #cbd5e1 !important;
+}
+
+.theme-light .shared-mail-search-input {
+  background-color: #f8fafc !important;
+  color: #0f172a !important;
+  border-color: #cbd5e1 !important;
+}
+
+.theme-light .shared-mail-search-input::placeholder {
+  color: #64748b !important;
+}
+
+/* Mail List Item in Light Mode */
+.theme-light .shared-mail-item {
+  color: #0f172a !important;
+  border-bottom-color: #e2e8f0 !important;
+}
+
+.theme-light .shared-mail-item:hover {
+  background-color: #f1f5f9 !important;
+}
+
+.theme-light .shared-mail-item.is-selected {
+  background-color: #e0f2fe !important; /* sky-100 */
+}
+
+.theme-light .shared-mail-item .mail-sender {
+  color: #020617 !important; /* Deepest black */
+  font-weight: 700 !important;
+}
+
+.theme-light .shared-mail-item .mail-subject {
+  color: #0f172a !important;
+}
+
+.theme-light .shared-mail-item .mail-preview {
+  color: #334155 !important; /* Clearly readable slate-700 */
+}
+
+.theme-light .shared-mail-item .mail-date {
+  color: #475569 !important; /* Legible slate-600 */
+  font-weight: 500 !important;
+}
+
+/* Reading Pane Header in Light Mode */
+.theme-light .shared-mail-header {
+  background-color: #ffffff !important;
+  border-color: #e2e8f0 !important;
+  color: #0f172a !important;
+}
+
+.theme-light .shared-mail-header .mail-header-subject {
+  color: #020617 !important;
+  font-weight: 800 !important;
+}
+
+.theme-light .shared-mail-header .mail-header-sender {
+  color: #0f172a !important;
+  font-weight: 700 !important;
+}
+
+.theme-light .shared-mail-header .mail-header-email {
+  color: #334155 !important;
+  font-weight: 600 !important;
+}
+
+.theme-light .shared-mail-header .mail-recipient-badge {
+  background-color: #f1f5f9 !important;
+  color: #0f172a !important;
+  border: 1px solid #cbd5e1 !important;
+  font-weight: 600 !important;
+}
+
+.theme-light .shared-mail-header .mail-header-date {
+  color: #334155 !important;
+  font-weight: 600 !important;
+}
+
+/* Reading Pane Mail Body Content in Light Mode */
+.theme-light .shared-mail-body-container {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+}
+
+/* Overwrite Outlook/Word embedded text colors (e.g., color:windowtext, color:gray, or faint font tags) to solid black in light mode */
+.theme-light .shared-mail-body,
+.theme-light .shared-mail-body * {
+  color: #0f172a;
+}
+
+.theme-light .shared-mail-body p,
+.theme-light .shared-mail-body span,
+.theme-light .shared-mail-body div,
+.theme-light .shared-mail-body td,
+.theme-light .shared-mail-body th,
+.theme-light .shared-mail-body li,
+.theme-light .shared-mail-body font,
+.theme-light .shared-mail-body b,
+.theme-light .shared-mail-body strong {
+  color: #0f172a !important;
+}
+
+/* Preserve links */
+.theme-light .shared-mail-body a,
+.theme-light .shared-mail-body a *,
+.theme-light .shared-mail-body a span {
+  color: #0284c7 !important;
+  text-decoration: underline !important;
+}
+
+/* Ensure images fit cleanly in viewport and display with proper aspect ratio */
+.shared-mail-body img,
+.shared-mail-body-container img {
+  max-width: 100% !important;
+  height: auto !important;
+  display: block !important;
+  margin: 8px 0 !important;
+  border-radius: 4px;
+}
+
+/* Outlook-style folder tree sidebar styling */
+.theme-light .shared-mail-folders-pane {
+  background-color: #f8fafc !important;
+  border-color: #e2e8f0 !important;
+}
+
+.theme-light .shared-mail-folder-item {
+  color: #0f172a !important;
+}
+
+.theme-light .shared-mail-folder-item:hover {
+  background-color: #e2e8f0 !important;
+}
+
+.theme-light .shared-mail-folder-item.is-selected {
+  background-color: #cbd5e1 !important;
+  color: #020617 !important;
+  font-weight: 700 !important;
+}
+
+/* Drag over folder visual hint */
+.drag-target-hover {
+  outline: 2px dashed #0284c7 !important;
+  outline-offset: -2px;
+  background-color: #e0f2fe !important;
+}
+
+/* ==========================================================
+   Light Mode Compose / Reply Modal Text Contrast Rules
+   ========================================================== */
+.theme-light .shared-mail-compose-modal {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+  border-color: #cbd5e1 !important;
+}
+
+.theme-light .shared-mail-compose-modal input,
+.theme-light .shared-mail-compose-modal textarea {
+  background-color: #ffffff !important;
+  color: #020617 !important;
+  border-color: #cbd5e1 !important;
+}
+
+.theme-light .shared-mail-compose-modal input::placeholder,
+.theme-light .shared-mail-compose-modal textarea::placeholder {
+  color: #64748b !important;
+}
+
+/* ==========================================================
+   Rich Email Table, Image, and Quote Rendering Rules
+   ========================================================== */
+.rich-editor-input table,
+.quoted-original-mail table,
+.prose table {
+  border-collapse: collapse !important;
+  width: 100%;
+  margin: 8px 0;
+}
+
+.rich-editor-input th,
+.rich-editor-input td,
+.quoted-original-mail th,
+.quoted-original-mail td,
+.prose th,
+.prose td {
+  border: 1px solid #cbd5e1 !important;
+  padding: 6px 10px !important;
+  font-size: 12px;
+  vertical-align: top;
+}
+
+.rich-editor-input th,
+.quoted-original-mail th,
+.prose th {
+  background-color: #f1f5f9 !important;
+  font-weight: 700 !important;
+  color: #0f172a !important;
+}
+
+.rich-editor-input img,
+.quoted-original-mail img,
+.prose img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 4px;
+  display: inline-block;
+  margin: 6px 0;
+}
+
+.quoted-original-mail {
+  font-family: inherit;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+
+
+

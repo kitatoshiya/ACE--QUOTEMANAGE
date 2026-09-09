@@ -65,6 +65,7 @@ import { SplashScreen } from "./components/SplashScreen";
 import { QuoteHistorySearch } from "./components/QuoteHistorySearch";
 import { ArrangementProgressView } from "./components/ArrangementProgressView";
 import { StockExtractorView } from "./components/StockExtractorView";
+import { SharedMailboxView } from "./components/SharedMailboxView";
 import { FirestoreUsageMonitorView } from "./components/FirestoreUsageMonitorView";
 import { recordFirestoreRead } from "./lib/firestoreMonitor";
 import { Activity } from "lucide-react";
@@ -217,7 +218,7 @@ export default function App() {
 
     // 3. Load Active View / Screen Mode for current user (Cache-First)
     const savedView = localStorage.getItem(`app_active_view_${userKey}`);
-    if (savedView && (savedView === "kanban" || savedView === "sticky_board" || savedView === "history_search" || savedView === "arrangement_progress" || savedView === "stock_extractor" || savedView === "firestore_monitor")) {
+    if (savedView && (savedView === "kanban" || savedView === "sticky_board" || savedView === "history_search" || savedView === "arrangement_progress" || savedView === "stock_extractor" || savedView === "shared_mail" || savedView === "firestore_monitor")) {
       setActiveView(savedView as ActiveView);
     } else {
       // Only fetch from Firestore if not cached locally
@@ -278,7 +279,7 @@ export default function App() {
       } catch (e) {}
     }
     const saved = localStorage.getItem(`app_active_view_${initialUserEmail}`);
-    if (saved && (saved === "kanban" || saved === "sticky_board" || saved === "history_search" || saved === "arrangement_progress" || saved === "stock_extractor" || saved === "firestore_monitor")) {
+    if (saved && (saved === "kanban" || saved === "sticky_board" || saved === "history_search" || saved === "arrangement_progress" || saved === "stock_extractor" || saved === "shared_mail" || saved === "firestore_monitor")) {
       return saved as ActiveView;
     }
     return "kanban";
@@ -306,7 +307,9 @@ export default function App() {
     const root = document.documentElement;
     root.classList.remove("theme-light", "theme-dark", "theme-cute", "theme-digital", "dark");
     root.classList.add(`theme-${theme}`);
-    root.classList.add("dark");
+    if (theme === "dark" || theme === "digital") {
+      root.classList.add("dark");
+    }
   }, [theme]);
 
   // Staff members state
@@ -393,6 +396,12 @@ export default function App() {
 
   // Active UI modal states
   const [isNewQuoteOpen, setIsNewQuoteOpen] = useState(false);
+  const [quoteDraftFromMail, setQuoteDraftFromMail] = useState<{
+    title?: string;
+    vesselName?: string;
+    airportCodes?: string[];
+    notes?: string;
+  } | undefined>(undefined);
   const [isBackupOpen, setIsBackupOpen] = useState(false);
   const [isUserSwitchOpen, setIsUserSwitchOpen] = useState(false);
   const [isStaffMasterOpen, setIsStaffMasterOpen] = useState(false);
@@ -1479,6 +1488,7 @@ export default function App() {
               onSelectQuote={(q) => setSelectedQuoteId(q.id)}
               onStatusChange={handleStatusChange}
               onArchiveQuote={handleArchiveQuote}
+              onNewQuoteInStatus={() => setIsNewQuoteOpen(true)}
               onOpenArrangementProgress={() => handleSetActiveView("arrangement_progress")}
             />
             <KanbanChatWindow
@@ -1510,6 +1520,16 @@ export default function App() {
             currentUser={currentUser}
             onBackToKanban={() => handleSetActiveView("kanban")}
           />
+        ) : activeView === "shared_mail" ? (
+          <SharedMailboxView
+            currentTheme={theme}
+            currentUser={currentUser}
+            onBackToKanban={() => handleSetActiveView("kanban")}
+            onCreateQuoteFromMail={(draft) => {
+              setQuoteDraftFromMail(draft);
+              setIsNewQuoteOpen(true);
+            }}
+          />
         ) : activeView === "firestore_monitor" ? (
           <FirestoreUsageMonitorView
             currentTheme={theme}
@@ -1534,11 +1554,15 @@ export default function App() {
       {/* Modals & Drawer */}
       <NewQuoteModal
         isOpen={isNewQuoteOpen}
-        onClose={() => setIsNewQuoteOpen(false)}
+        onClose={() => {
+          setIsNewQuoteOpen(false);
+          setQuoteDraftFromMail(undefined);
+        }}
         currentUser={currentUser}
         staffMembers={staffMembers}
         quotes={quotes}
         onCreateQuote={handleCreateQuote}
+        initialDraft={quoteDraftFromMail}
       />
 
       <ThreadDrawer

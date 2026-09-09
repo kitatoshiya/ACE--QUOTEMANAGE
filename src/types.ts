@@ -6,7 +6,72 @@ export type QuoteStatus =
   | "closed_or_on_hold";
 
 export type AppTheme = "light" | "dark" | "cute" | "digital";
-export type ActiveView = "kanban" | "sticky_board" | "history_search" | "arrangement_progress" | "stock_extractor" | "firestore_monitor";
+export type ActiveView =
+  | "kanban"
+  | "sticky_board"
+  | "history_search"
+  | "arrangement_progress"
+  | "stock_extractor"
+  | "shared_mail"
+  | "firestore_monitor";
+
+export interface SharedMailRecipient {
+  name?: string;
+  address: string;
+}
+
+export interface SharedMailAttachment {
+  id: string;
+  name: string;
+  contentType: string;
+  size: number;
+  isInline?: boolean;
+}
+
+export interface SharedMailMessage {
+  id: string;
+  conversationId?: string;
+  subject: string;
+  bodyPreview: string;
+  bodyHtml?: string;
+  bodyText?: string;
+  from?: SharedMailRecipient;
+  toRecipients: SharedMailRecipient[];
+  ccRecipients: SharedMailRecipient[];
+  receivedDateTime: string;
+  sentDateTime?: string;
+  hasAttachments: boolean;
+  attachments?: SharedMailAttachment[];
+  isRead: boolean;
+  importance?: "low" | "normal" | "high";
+  isDemo?: boolean;
+}
+
+export interface SharedMailboxStatus {
+  configured: boolean;
+  sharedMailbox?: string;
+  tenantIdConfigured: boolean;
+  clientIdConfigured: boolean;
+  clientSecretConfigured: boolean;
+  connected?: boolean;
+  isSecretIdError?: boolean;
+  error?: string;
+  tokenRoles?: string[];
+  hasMailRead?: boolean;
+  hasMailSend?: boolean;
+  needsApiPermissions?: boolean;
+}
+
+export interface SendSharedMailPayload {
+  to: string[];
+  cc?: string[];
+  bcc?: string[];
+  subject: string;
+  bodyHtml: string;
+  bodyText?: string;
+  replyToMessageId?: string;
+  mailbox?: string;
+}
 
 export interface ArrangementTaskItem {
   id: number; // 1 to 7

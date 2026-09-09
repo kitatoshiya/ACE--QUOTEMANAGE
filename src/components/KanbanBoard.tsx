@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from "react";
 import { QuotationItem, QuoteMessage, QuoteStatus, StaffMember, StatusColumnConfig, UserProfile, isQuoteAssignedToUser, parseCustomsDateToTime } from "../types";
 import { KanbanCard } from "./KanbanCard";
-import { FileText, Send, CheckCircle2, RefreshCw, Award, ArchiveX, ArrowDown, AlertTriangle, AlertOctagon, Timer, Clock, Filter, Calendar } from "lucide-react";
+import { FileText, Send, CheckCircle2, RefreshCw, Award, ArchiveX, ArrowDown, AlertTriangle, AlertOctagon, Timer, Clock, Filter, Calendar, Plus } from "lucide-react";
 import { getElapsedStats } from "../lib/timeUtils";
 
 interface KanbanBoardProps {
@@ -62,6 +62,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
   onSelectQuote,
   onStatusChange,
   onArchiveQuote,
+  onNewQuoteInStatus,
   onOpenArrangementProgress,
 }) => {
   const [activeDragOverCol, setActiveDragOverCol] = useState<QuoteStatus | null>(null);
@@ -292,15 +293,29 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
 
               {/* Column Header */}
               <div className="flex items-center justify-between pb-3 px-1 border-b border-slate-200/80 dark:border-slate-800 mb-3">
-                <div className="flex items-center gap-2">
-                  <h2 className="font-bold text-sm text-slate-800 dark:text-slate-100 flex items-center gap-1.5">
+                <div className="flex items-center gap-2 flex-1 min-w-0">
+                  <h2 className="font-bold text-sm text-slate-800 dark:text-slate-100 flex items-center gap-1.5 shrink-0">
                     {column.title}
                   </h2>
                   <span
-                    className={`px-2 py-0.5 text-[10px] font-bold rounded-full border ${column.badgeBg}`}
+                    className={`px-2 py-0.5 text-[10px] font-bold rounded-full border shrink-0 ${column.badgeBg}`}
                   >
                     {colQuotes.length}
                   </span>
+                  {column.id === "requested" && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onNewQuoteInStatus?.("requested");
+                      }}
+                      className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-extrabold rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white shadow-xs hover:shadow-emerald-500/30 transition-all cursor-pointer transform hover:scale-105 active:scale-95 shrink-0 ml-auto"
+                      title="新規見積作成モーダルを開く"
+                    >
+                      <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
+                      <span>+新規見積作成</span>
+                    </button>
+                  )}
                 </div>
 
                 <div className="flex items-center gap-1.5">
