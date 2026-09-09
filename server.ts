@@ -224,12 +224,12 @@ function getRolesFromJwt(token: string): string[] {
 }
 
 async function getMicrosoftGraphAccessToken(forceRefresh = false): Promise<string> {
-  const tenantId = process.env.MICROSOFT_TENANT_ID?.trim();
-  const clientId = process.env.MICROSOFT_CLIENT_ID?.trim();
-  const clientSecret = process.env.MICROSOFT_CLIENT_SECRET?.trim();
+  const tenantId = (process.env.MICROSOFT_TENANT_ID || process.env.MS_TENANT_ID)?.trim();
+  const clientId = (process.env.MICROSOFT_CLIENT_ID || process.env.MS_CLIENT_ID)?.trim();
+  const clientSecret = (process.env.MICROSOFT_CLIENT_SECRET || process.env.MS_CLIENT_SECRET)?.trim();
 
   if (!tenantId || !clientId || !clientSecret) {
-    throw new Error("Microsoft 365 連携用の環境変数 (MICROSOFT_TENANT_ID, MICROSOFT_CLIENT_ID, MICROSOFT_CLIENT_SECRET) が未設定です。");
+    throw new Error("Microsoft 365 連携用の環境変数 (MICROSOFT_TENANT_ID / MS_TENANT_ID, MICROSOFT_CLIENT_ID / MS_CLIENT_ID, MICROSOFT_CLIENT_SECRET / MS_CLIENT_SECRET) が未設定です。");
   }
 
   // Pre-check: Detect if user inadvertently pasted the "Secret ID" (GUID format) instead of "Secret Value"
@@ -310,10 +310,10 @@ async function getMicrosoftGraphAccessToken(forceRefresh = false): Promise<strin
 // 1. Get Status of Microsoft 365 Connection
 app.get("/api/shared-mail/status", async (req, res) => {
   const forceRefresh = req.query.refresh === "true";
-  const tenantId = process.env.MICROSOFT_TENANT_ID?.trim();
-  const clientId = process.env.MICROSOFT_CLIENT_ID?.trim();
-  const clientSecret = process.env.MICROSOFT_CLIENT_SECRET?.trim();
-  const sharedMailbox = (req.query.mailbox as string)?.trim() || process.env.MICROSOFT_SHARED_MAILBOX?.trim() || "";
+  const tenantId = (process.env.MICROSOFT_TENANT_ID || process.env.MS_TENANT_ID)?.trim();
+  const clientId = (process.env.MICROSOFT_CLIENT_ID || process.env.MS_CLIENT_ID)?.trim();
+  const clientSecret = (process.env.MICROSOFT_CLIENT_SECRET || process.env.MS_CLIENT_SECRET)?.trim();
+  const sharedMailbox = (req.query.mailbox as string)?.trim() || (process.env.MICROSOFT_SHARED_MAILBOX || process.env.MS_SHARED_MAILBOX)?.trim() || "";
 
   const configured = Boolean(tenantId && clientId && clientSecret);
   const isSecretId = Boolean(clientSecret && isGuidFormat(clientSecret));
@@ -326,7 +326,7 @@ app.get("/api/shared-mail/status", async (req, res) => {
       clientSecretConfigured: Boolean(clientSecret),
       sharedMailbox: sharedMailbox || undefined,
       connected: false,
-      note: "環境変数（MICROSOFT_TENANT_ID, MICROSOFT_CLIENT_ID, MICROSOFT_CLIENT_SECRET）を設定すると本番Microsoft365アカウントと直接通信します。",
+      note: "環境変数（MICROSOFT_TENANT_ID / MS_TENANT_ID, MICROSOFT_CLIENT_ID / MS_CLIENT_ID, MICROSOFT_CLIENT_SECRET / MS_CLIENT_SECRET）を設定すると本番Microsoft365アカウントと直接通信します。",
     });
   }
 
@@ -481,7 +481,7 @@ let folderTreeCache: {
 
 // 1.5 Get Mail Folder Tree Hierarchy (Web Outlook style)
 app.get("/api/shared-mail/folders", async (req, res) => {
-  const targetMailbox = (req.query.mailbox as string)?.trim() || process.env.MICROSOFT_SHARED_MAILBOX?.trim();
+  const targetMailbox = (req.query.mailbox as string)?.trim() || (process.env.MICROSOFT_SHARED_MAILBOX || process.env.MS_SHARED_MAILBOX)?.trim();
   const forceRefresh = req.query.refresh === "true";
 
   let token: string | null = null;
@@ -645,7 +645,7 @@ app.get("/api/shared-mail/messages", async (req, res) => {
   const folderId = (req.query.folderId as string)?.trim();
   const top = parseInt((req.query.top as string) || "30", 10);
   const search = ((req.query.search as string) || "").trim();
-  const targetMailbox = (req.query.mailbox as string)?.trim() || process.env.MICROSOFT_SHARED_MAILBOX?.trim();
+  const targetMailbox = (req.query.mailbox as string)?.trim() || (process.env.MICROSOFT_SHARED_MAILBOX || process.env.MS_SHARED_MAILBOX)?.trim();
   const forceDemo = req.query.demo === "true";
   const forceRefresh = req.query.refresh === "true";
 
@@ -833,7 +833,7 @@ app.get("/api/shared-mail/messages", async (req, res) => {
 // 3. Get Single Message Details (HTML Content & Attachments)
 app.get("/api/shared-mail/messages/:id", async (req, res) => {
   const messageId = req.params.id;
-  const targetMailbox = (req.query.mailbox as string)?.trim() || process.env.MICROSOFT_SHARED_MAILBOX?.trim();
+  const targetMailbox = (req.query.mailbox as string)?.trim() || (process.env.MICROSOFT_SHARED_MAILBOX || process.env.MS_SHARED_MAILBOX)?.trim();
 
   let token: string | null = null;
   try {
@@ -968,7 +968,7 @@ app.get("/api/shared-mail/messages/:id", async (req, res) => {
 // 3.1 Get/Download Single Attachment
 app.get("/api/shared-mail/messages/:msgId/attachments/:attId", async (req, res) => {
   const { msgId, attId } = req.params;
-  const targetMailbox = (req.query.mailbox as string)?.trim() || process.env.MICROSOFT_SHARED_MAILBOX?.trim();
+  const targetMailbox = (req.query.mailbox as string)?.trim() || (process.env.MICROSOFT_SHARED_MAILBOX || process.env.MS_SHARED_MAILBOX)?.trim();
 
   let token: string | null = null;
   try {
@@ -1006,7 +1006,7 @@ app.get("/api/shared-mail/messages/:msgId/attachments/:attId", async (req, res) 
 app.patch("/api/shared-mail/messages/:id/read-status", async (req, res) => {
   const messageId = req.params.id;
   const { isRead } = req.body;
-  const targetMailbox = (req.query.mailbox as string)?.trim() || process.env.MICROSOFT_SHARED_MAILBOX?.trim();
+  const targetMailbox = (req.query.mailbox as string)?.trim() || (process.env.MICROSOFT_SHARED_MAILBOX || process.env.MS_SHARED_MAILBOX)?.trim();
 
   let token: string | null = null;
   try {
@@ -1047,7 +1047,7 @@ app.patch("/api/shared-mail/messages/:id/read-status", async (req, res) => {
 app.post("/api/shared-mail/messages/:id/move", async (req, res) => {
   const messageId = req.params.id;
   const { destinationId } = req.body;
-  const targetMailbox = (req.query.mailbox as string)?.trim() || process.env.MICROSOFT_SHARED_MAILBOX?.trim();
+  const targetMailbox = (req.query.mailbox as string)?.trim() || (process.env.MICROSOFT_SHARED_MAILBOX || process.env.MS_SHARED_MAILBOX)?.trim();
 
   if (!destinationId) {
     return res.status(400).json({ error: "移動先フォルダID(destinationId)が指定されていません。" });
@@ -1112,7 +1112,7 @@ app.post("/api/shared-mail/messages/:id/move", async (req, res) => {
 // 5. Send Mail from Shared Mailbox
 app.post("/api/shared-mail/send", async (req, res) => {
   const { to, cc, bcc, subject, bodyHtml, bodyText, mailbox } = req.body;
-  const targetMailbox = (mailbox as string)?.trim() || process.env.MICROSOFT_SHARED_MAILBOX?.trim();
+  const targetMailbox = (mailbox as string)?.trim() || (process.env.MICROSOFT_SHARED_MAILBOX || process.env.MS_SHARED_MAILBOX)?.trim();
 
   if (!to || !Array.isArray(to) || to.length === 0) {
     return res.status(400).json({ error: "宛先(To)が指定されていません。" });
@@ -1226,4 +1226,10 @@ async function startServer() {
   });
 }
 
-startServer();
+if (!process.env.VERCEL) {
+  startServer();
+}
+
+export default app;
+export { app };
+
