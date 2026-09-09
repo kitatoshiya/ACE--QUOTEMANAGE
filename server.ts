@@ -26,6 +26,81 @@ app.get("/api/health", (req, res) => {
   res.json({ status: "ok", time: new Date().toISOString() });
 });
 
+// Environment Variable & Microsoft Graph Diagnostics Endpoint
+app.get("/api/debug-env", async (req, res) => {
+  const tenantId = (process.env.MICROSOFT_TENANT_ID || process.env.MS_TENANT_ID)?.trim();
+  const clientId = (process.env.MICROSOFT_CLIENT_ID || process.env.MS_CLIENT_ID)?.trim();
+  const clientSecret = (process.env.MICROSOFT_CLIENT_SECRET || process.env.MS_CLIENT_SECRET)?.trim();
+  const sharedMailbox = (process.env.MICROSOFT_SHARED_MAILBOX || process.env.MS_SHARED_MAILBOX)?.trim();
+
+  const maskSecret = (s?: string) => {
+    if (!s) return "(未設定)";
+    if (s.length <= 8) return s.slice(0, 2) + "**** (長: " + s.length + "文字)";
+    return s.slice(0, 4) + "..." + s.slice(-4) + " (全 " + s.length + " 文字)";
+  };
+
+  const isSecretId = Boolean(clientSecret && isGuidFormat(clientSecret));
+
+  let tokenTestResult: any = { status: "not_attempted" };
+  if (tenantId && clientId && clientSecret) {
+    if (isSecretId) {
+      tokenTestResult = {
+        status: "error",
+        error: "【設定エラー】MICROSOFT_CLIENT_SECRET に『シークレット ID (GUID)』が設定されています。Azure Portalの「証明書とシークレット」で発行された『値 (Value)』を設定してください。",
+      };
+    } else {
+      try {
+        const tokenUrl = `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/token`;
+        const params = new URLSearchParams();
+        params.append("client_id", clientId);
+        params.append("client_secret", clientSecret);
+        params.append("scope", "https://graph.microsoft.com/.default");
+        params.append("grant_type", "client_credentials");
+
+        const testRes = await fetch(tokenUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: params.toString(),
+        });
+
+        const testJson = await testRes.json() as any;
+        if (testRes.ok) {
+          tokenTestResult = {
+            status: "success",
+            message: "Microsoft Graph API トークン取得に成功しました！",
+            tokenType: testJson.token_type,
+            expiresIn: testJson.expires_in,
+          };
+        } else {
+          tokenTestResult = {
+            status: "failed",
+            httpCode: testRes.status,
+            error: testJson.error,
+            errorDescription: testJson.error_description,
+          };
+        }
+      } catch (e: any) {
+        tokenTestResult = {
+          status: "exception",
+          message: e.message,
+        };
+      }
+    }
+  }
+
+  return res.json({
+    environment: {
+      MICROSOFT_TENANT_ID: maskSecret(tenantId),
+      MICROSOFT_CLIENT_ID: maskSecret(clientId),
+      MICROSOFT_CLIENT_SECRET: maskSecret(clientSecret),
+      MICROSOFT_SHARED_MAILBOX: sharedMailbox || "(未設定)",
+      isSecretIdError: isSecretId,
+    },
+    tokenTest: tokenTestResult,
+    timestamp: new Date().toISOString(),
+  });
+});
+
 // Helper to obtain an Access Token for OAuth2 / Modern Auth if configured
 async function resolveOAuth2AccessToken(settings: any): Promise<string | null> {
   const authMethod = settings?.authMethod || "PASSWORD";
