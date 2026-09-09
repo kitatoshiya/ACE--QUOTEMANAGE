@@ -1292,13 +1292,22 @@ app.post("/api/shared-mail/send", async (req, res) => {
 
 // Start Server with Vite Middleware in dev or static serve in prod
 async function startServer() {
+  if (process.env.VERCEL) {
+    return;
+  }
+
   if (process.env.NODE_ENV !== "production") {
-    const { createServer: createViteServer } = await import("vite");
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: "spa",
-    });
-    app.use(vite.middlewares);
+    try {
+      const viteModule = "vite";
+      const { createServer: createViteServer } = await import(/* vite-ignore */ viteModule);
+      const vite = await createViteServer({
+        server: { middlewareMode: true },
+        appType: "spa",
+      });
+      app.use(vite.middlewares);
+    } catch (e) {
+      console.warn("[Vite Middleware Load Warning]:", e);
+    }
   } else {
     const distPath = path.join(process.cwd(), "dist");
     app.use(express.static(distPath));
@@ -1318,4 +1327,5 @@ if (!process.env.VERCEL) {
 
 export default app;
 export { app };
+
 
