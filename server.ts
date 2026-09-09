@@ -17,15 +17,17 @@ app.use((req, res, next) => {
     return res.status(200).end();
   }
 
-  // Restore original request URL and ensure /api prefix for Express routing
-  const forwardedUri = req.headers["x-forwarded-uri"] as string;
-  const originalUrl = req.headers["x-original-url"] as string;
-  if (forwardedUri && forwardedUri.startsWith("/api")) {
-    req.url = forwardedUri;
-  } else if (originalUrl && originalUrl.startsWith("/api")) {
-    req.url = originalUrl;
-  } else if (!req.url.startsWith("/api")) {
-    req.url = "/api" + (req.url.startsWith("/") ? "" : "/") + req.url;
+  // On Vercel, restore original request URL and ensure /api prefix for Express routing
+  if (process.env.VERCEL) {
+    const forwardedUri = req.headers["x-forwarded-uri"] as string;
+    const originalUrl = req.headers["x-original-url"] as string;
+    if (forwardedUri && forwardedUri.startsWith("/api")) {
+      req.url = forwardedUri;
+    } else if (originalUrl && originalUrl.startsWith("/api")) {
+      req.url = originalUrl;
+    } else if (!req.url.startsWith("/api")) {
+      req.url = "/api" + (req.url.startsWith("/") ? "" : "/") + req.url;
+    }
   }
 
   next();
@@ -736,6 +738,32 @@ app.get("/api/shared-mail/folders", async (req, res) => {
   });
 });
 
+function deduplicateServerMessages(msgs: any[]): any[] {
+  const seenIds = new Set<string>();
+  const result: any[] = [];
+
+  for (const msg of msgs) {
+    if (!msg || !msg.id) continue;
+    if (seenIds.has(msg.id)) continue;
+    seenIds.add(msg.id);
+
+    const msgTime = new Date(msg.receivedDateTime || msg.sentDateTime || 0).getTime();
+    const isDuplicate = result.some((existing) => {
+      if (existing.subject === msg.subject && existing.bodyPreview === msg.bodyPreview) {
+        const existingTime = new Date(existing.receivedDateTime || existing.sentDateTime || 0).getTime();
+        return Math.abs(existingTime - msgTime) < 60000;
+      }
+      return false;
+    });
+
+    if (!isDuplicate) {
+      result.push(msg);
+    }
+  }
+
+  return result;
+}
+
 // 2. List Messages from Shared Mailbox
 app.get("/api/shared-mail/messages", async (req, res) => {
   const folder = ((req.query.folder as string) || "inbox").toLowerCase();
@@ -777,7 +805,7 @@ app.get("/api/shared-mail/messages", async (req, res) => {
           m.from?.address?.toLowerCase().includes(s)
       );
     }
-    return filtered;
+    return deduplicateServerMessages(filtered);
   };
 
   if (forceDemo) {
@@ -891,7 +919,7 @@ app.get("/api/shared-mail/messages", async (req, res) => {
 
       return res.json({
         success: true,
-        messages,
+        messages: deduplicateServerMessages(messages),
         mailbox: targetMailbox,
         isLive: true,
       });

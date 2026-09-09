@@ -160,6 +160,32 @@ async function safeFetchJson<T = any>(
   }
 }
 
+const deduplicateMessages = (msgs: SharedMailMessage[] = []): SharedMailMessage[] => {
+  const seenIds = new Set<string>();
+  const result: SharedMailMessage[] = [];
+
+  for (const msg of msgs) {
+    if (!msg || !msg.id) continue;
+    if (seenIds.has(msg.id)) continue;
+    seenIds.add(msg.id);
+
+    const msgTime = new Date(msg.receivedDateTime || msg.sentDateTime || 0).getTime();
+    const isDuplicate = result.some((existing) => {
+      if (existing.subject === msg.subject && existing.bodyPreview === msg.bodyPreview) {
+        const existingTime = new Date(existing.receivedDateTime || existing.sentDateTime || 0).getTime();
+        return Math.abs(existingTime - msgTime) < 60000;
+      }
+      return false;
+    });
+
+    if (!isDuplicate) {
+      result.push(msg);
+    }
+  }
+
+  return result;
+};
+
 export const SharedMailboxView: React.FC<SharedMailboxViewProps> = ({
   currentTheme,
   currentUser,
@@ -324,13 +350,13 @@ export const SharedMailboxView: React.FC<SharedMailboxViewProps> = ({
           if (data.graphError) {
             setGraphError(data.graphError);
             if (forceDemo && data.demoFallbackMessages) {
-              setMessages(data.demoFallbackMessages);
+              setMessages(deduplicateMessages(data.demoFallbackMessages));
             } else {
-              setMessages(data.messages || []);
+              setMessages(deduplicateMessages(data.messages || []));
             }
           } else {
             setGraphError(null);
-            setMessages(data.messages || []);
+            setMessages(deduplicateMessages(data.messages || []));
           }
 
           if (data.authError) {
@@ -590,6 +616,8 @@ export const SharedMailboxView: React.FC<SharedMailboxViewProps> = ({
   // Send Email Handler
   const handleSendMail = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSending) return;
+
     if (!composeTo.trim()) {
       showToast("宛先 (To) を入力してください。", "error");
       return;
