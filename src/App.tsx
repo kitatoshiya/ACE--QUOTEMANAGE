@@ -42,8 +42,10 @@ import {
   setDoc,
   deleteDoc,
   onSnapshot,
+  getDocs,
   getDocFromServer,
   getDoc,
+  query,
 } from "firebase/firestore";
 import { Navbar } from "./components/Navbar";
 import { KanbanBoard, KANBAN_COLUMNS } from "./components/KanbanBoard";
@@ -426,18 +428,19 @@ export default function App() {
     testConnection();
   }, []);
 
-  // 1. Real-time Firestore Sync for Staff Members
+  // 1. One-time Fetch and Periodic Check for Staff Members (Avoid continuous onSnapshot)
   useEffect(() => {
     if (!db) return;
-    const colRef = collection(db, "staffMembers");
-    const unsubscribe = onSnapshot(
-      colRef,
-      (snapshot) => {
-        recordFirestoreRead("staffMembers", snapshot.size || 1, "snapshot_update", undefined, currentUser?.email);
+    let isMounted = true;
+    const fetchStaff = async () => {
+      try {
+        const colRef = collection(db!, "staffMembers");
+        const snapshot = await getDocs(colRef);
+        if (!isMounted) return;
+        recordFirestoreRead("staffMembers", snapshot.size || 1, "get_docs", undefined, currentUser?.email);
         if (snapshot.empty) {
-          // Initial seed if empty
           INITIAL_SAMPLE_STAFF.forEach((s) => {
-            setDoc(doc(db, "staffMembers", s.id), cleanForFirestore(s)).catch((err) =>
+            setDoc(doc(db!, "staffMembers", s.id), cleanForFirestore(s)).catch((err) =>
               handleFirestoreError(err, OperationType.WRITE, `staffMembers/${s.id}`)
             );
           });
@@ -449,12 +452,18 @@ export default function App() {
           setStaffMembers(remoteStaff);
           saveLocalStaff(remoteStaff);
         }
-      },
-      (error) => {
+      } catch (error) {
         handleFirestoreError(error, OperationType.LIST, "staffMembers");
       }
-    );
-    return () => unsubscribe();
+    };
+
+    fetchStaff();
+    // Re-check once every 5 minutes in background instead of continuous snapshot
+    const interval = setInterval(fetchStaff, 5 * 60 * 1000);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
   }, []);
 
   // 2. Real-time Firestore Sync for Quotations
@@ -601,16 +610,19 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
-  // 3b. Real-time Firestore Sync for Kanban Chat Messages
+  // 3b. Firestore Sync for Kanban Chat Messages (Initial fetch + 30s background poll)
   useEffect(() => {
     if (!db) return;
-    const colRef = collection(db, "chat_messages");
-    const unsubscribe = onSnapshot(
-      colRef,
-      (snapshot) => {
+    let isMounted = true;
+    const fetchChatMessages = async () => {
+      try {
+        const colRef = collection(db!, "chat_messages");
+        const snapshot = await getDocs(colRef);
+        if (!isMounted) return;
+        recordFirestoreRead("chat_messages", snapshot.size || 1, "get_docs", undefined, currentUserRef.current?.email);
         if (snapshot.empty) {
           INITIAL_SAMPLE_CHAT_MESSAGES.forEach((m) => {
-            setDoc(doc(db, "chat_messages", m.id), cleanForFirestore(m)).catch((err) =>
+            setDoc(doc(db!, "chat_messages", m.id), cleanForFirestore(m)).catch((err) =>
               handleFirestoreError(err, OperationType.WRITE, `chat_messages/${m.id}`)
             );
           });
@@ -630,30 +642,42 @@ export default function App() {
           setChatMessages(remoteChatMsgs);
           saveLocalChatMessages(remoteChatMsgs);
         }
-      },
-      (error) => {
+      } catch (error) {
         handleFirestoreError(error, OperationType.LIST, "chat_messages");
       }
-    );
-    return () => unsubscribe();
+    };
+
+    fetchChatMessages();
+    const interval = setInterval(fetchChatMessages, 30 * 1000);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
   }, []);
 
-  // 3c. Real-time Firestore Sync for Kanban Chat Typing Status
+  // 3c. Firestore Sync for Kanban Chat Typing Status (Polling interval instead of continuous snapshot)
   useEffect(() => {
     if (!db) return;
-    const colRef = collection(db, "chat_typing");
-    const unsubscribe = onSnapshot(
-      colRef,
-      (snapshot) => {
+    let isMounted = true;
+    const fetchTypingStatus = async () => {
+      try {
+        const colRef = collection(db!, "chat_typing");
+        const snapshot = await getDocs(colRef);
+        if (!isMounted) return;
         const typingStatuses: ChatTypingStatus[] = [];
         snapshot.forEach((d) => typingStatuses.push(d.data() as ChatTypingStatus));
         setChatTypingUsers(typingStatuses);
-      },
-      (error) => {
-        console.error("Error fetching typing status:", error);
+      } catch (error) {
+        // Silent catch for typing
       }
-    );
-    return () => unsubscribe();
+    };
+
+    fetchTypingStatus();
+    const interval = setInterval(fetchTypingStatus, 15 * 1000);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
   }, []);
 
   // Sync with Firebase Auth user changes

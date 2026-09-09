@@ -15,6 +15,7 @@ import { getAuth, Auth, onAuthStateChanged } from "firebase/auth";
 import firebaseConfigJson from "../../firebase-applet-config.json";
 import { StaffMember, QuotationItem, QuoteMessage, QuoteStatus, StickyNote, ChatMessage } from "../types";
 import { recordFirestoreQuotaError } from "./firestoreMonitor";
+import { toastNotifier } from "./toastNotifier";
 
 let app: FirebaseApp;
 let db: Firestore | null = null;
@@ -56,6 +57,8 @@ export interface FirestoreErrorInfo {
   };
 }
 
+let lastQuotaToastTime = 0;
+
 export function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
   const errMsg = error instanceof Error ? error.message : String(error);
   const errInfo: FirestoreErrorInfo = {
@@ -77,6 +80,16 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
   console.error("Firestore Error: ", JSON.stringify(errInfo));
   if (errMsg.toLowerCase().includes("quota") || errMsg.toLowerCase().includes("limit exceeded")) {
     recordFirestoreQuotaError(path, errMsg, auth?.currentUser?.email || undefined);
+    const now = Date.now();
+    if (now - lastQuotaToastTime > 60000) {
+      lastQuotaToastTime = now;
+      toastNotifier.show({
+        type: "warning",
+        title: "Firestore Free Quota 到達（ローカルキャッシュ稼働中）",
+        message: "本日のFirestore無料枠（50,000回）の上限に達しました。ローカル保存データにて操作を継続します。翌日0時に自動リセットされます。",
+        duration: 10000,
+      });
+    }
   }
 }
 
